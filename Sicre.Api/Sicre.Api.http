@@ -1,0 +1,6 @@
+@Sicre.Api_HostAddress = http://localhost:5110
+
+GET {{Sicre.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

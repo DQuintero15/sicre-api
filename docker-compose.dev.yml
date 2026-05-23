@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: sicre_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sicre_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - sicre_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sicre_api_dev
+    restart: unless-stopped
+    ports:
+      - "9001:9001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=9001
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=sicre_dev;Username=postgres;Password=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  sicre_postgres_data:
+    driver: local
