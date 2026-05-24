@@ -16,6 +16,9 @@ docker compose -f docker-compose.dev.yml logs -f api
 
 # Bajar
 docker compose -f docker-compose.dev.yml down
+
+# Reljejar cambios en la api sin bajar postgres
+docker compose -f docker-compose.dev.yml up -d --build api
 ```
 
 Scalar UI disponible en `http://localhost:9001/scalar/v1` cuando corre en modo Development.

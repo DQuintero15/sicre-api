@@ -24,6 +24,7 @@ public abstract class BaseController : ControllerBase
             HttpStatusCode.BadRequest => BadRequest(result),
             HttpStatusCode.Unauthorized => Unauthorized(result),
             HttpStatusCode.Forbidden => StatusCode(403, result),
+            HttpStatusCode.Conflict => StatusCode(409, result),
             HttpStatusCode.TooManyRequests => StatusCode(429, result),
             _ => Ok(result),
         };

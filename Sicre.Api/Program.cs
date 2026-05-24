@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +16,8 @@ using Sicre.Api.Features.Branches.Services;
 using Sicre.Api.Features.ControlEntities.Services;
 using Sicre.Api.Features.Positions.Services;
 using Sicre.Api.Features.Processes.Services;
+using Sicre.Api.Features.ReportInstances.Services;
+using Sicre.Api.Features.Reports.Services;
 using Sicre.Api.Features.Roles.Services;
 using Sicre.Api.Features.TwoFactor.Services;
 using Sicre.Api.Features.Users.Services;
@@ -133,11 +137,21 @@ builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IProcessService, ProcessService>();
 builder.Services.AddScoped<IControlEntityService, ControlEntityService>();
 
+// Report feature services
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IReportInstanceGenerator, ReportInstanceGenerator>();
+builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
+builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
+
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
 
 // Seeders con dependencias
 builder.Services.AddScoped<AdminSeeder>();
+
+// Validators
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Controllers
 builder.Services.AddControllers();
@@ -194,6 +208,13 @@ RecurringJob.AddOrUpdate<IMaintenanceJobService>(
     service => service.CleanupRefreshTokensAsync(),
     "0 3 * * *",
     new RecurringJobOptions { TimeZone = colombiaZone }
+);
+
+RecurringJob.AddOrUpdate<IReportGenerationJobService>(
+    "report-generation",
+    job => job.RunAsync(),
+    "0 11 * * *",
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
 );
 
 app.Run();
