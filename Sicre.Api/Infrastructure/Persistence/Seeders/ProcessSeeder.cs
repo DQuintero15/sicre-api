@@ -34,6 +34,8 @@ public static class ProcessSeeder
         "Financiero",
         "Gestión Legal y Regulatoria",
         "Operaciones",
+        "Emergencias",
+        "Operación GN",
     ];
 
     public static async Task SeedAsync(ApplicationDbContext context)
