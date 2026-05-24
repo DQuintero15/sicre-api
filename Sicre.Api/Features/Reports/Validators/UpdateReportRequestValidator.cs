@@ -59,8 +59,8 @@ public class UpdateReportRequestValidator : AbstractValidator<UpdateReportReques
             x => x.AlertCriticalDays.HasValue,
             () =>
                 RuleFor(x => x.AlertCriticalDays)
-                    .GreaterThan(0)
-                    .WithMessage("Los días de alerta crítica deben ser mayores a 0.")
+                    .GreaterThanOrEqualTo(0)
+                    .WithMessage("Los días de alerta crítica no pueden ser negativos.")
         );
 
         When(

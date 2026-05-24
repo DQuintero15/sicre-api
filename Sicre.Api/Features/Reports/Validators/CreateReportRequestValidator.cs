@@ -25,8 +25,8 @@ public class CreateReportRequestValidator : AbstractValidator<CreateReportReques
             .GreaterThan(0)
             .WithMessage("Los días de seguimiento deben ser mayores a 0.");
         RuleFor(x => x.AlertCriticalDays)
-            .GreaterThan(0)
-            .WithMessage("Los días de alerta crítica deben ser mayores a 0.");
+            .GreaterThanOrEqualTo(0)
+            .WithMessage("Los días de alerta crítica no pueden ser negativos.");
         RuleFor(x => x.StartDate).NotEmpty().WithMessage("La fecha de inicio es requerida.");
 
         When(
