@@ -36,6 +36,10 @@ public static class ProcessSeeder
         "Operaciones",
         "Emergencias",
         "Operación GN",
+        "Atención al Cliente",
+        "Comercialización de Gas y Otras Energias",
+        "Mantenimiento",
+        "Tesorería y Presupuesto",
     ];
 
     public static async Task SeedAsync(ApplicationDbContext context)
