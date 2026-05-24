@@ -95,10 +95,8 @@ public class ControlEntityService(ILogger<ControlEntityService> logger, Applicat
 
             if (!string.IsNullOrWhiteSpace(filter.Name))
             {
-                var name = filter.Name.ToUpper();
-                query = query.Where(e =>
-                    EF.Functions.Unaccent(e.Name).ToUpper().Contains(EF.Functions.Unaccent(name))
-                );
+                var name = filter.Name.ToLower();
+                query = query.Where(e => e.Name.ToLower().Contains(name));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.Nit))

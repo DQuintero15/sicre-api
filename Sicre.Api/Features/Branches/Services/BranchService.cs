@@ -69,10 +69,8 @@ public class BranchService(ILogger<BranchService> logger, ApplicationDbContext d
 
             if (!string.IsNullOrWhiteSpace(filter.Name))
             {
-                var name = filter.Name.ToUpper();
-                query = query.Where(b =>
-                    EF.Functions.Unaccent(b.Name).ToUpper().Contains(EF.Functions.Unaccent(name))
-                );
+                var name = filter.Name.ToLower();
+                query = query.Where(b => b.Name.ToLower().Contains(name));
             }
 
             var total = await query.CountAsync();

@@ -139,26 +139,20 @@ public class UserService(
 
             if (!string.IsNullOrWhiteSpace(filter.Email))
             {
-                var email = filter.Email.ToUpper();
-                query = query.Where(u =>
-                    EF.Functions.Unaccent(u.Email!).ToUpper().Contains(EF.Functions.Unaccent(email))
-                );
+                var email = filter.Email.ToLower();
+                query = query.Where(u => u.Email!.ToLower().Contains(email));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.FirstName))
             {
-                var fn = filter.FirstName.ToUpper();
-                query = query.Where(u =>
-                    EF.Functions.Unaccent(u.FirstName).ToUpper().Contains(EF.Functions.Unaccent(fn))
-                );
+                var fn = filter.FirstName.ToLower();
+                query = query.Where(u => u.FirstName.ToLower().Contains(fn));
             }
 
             if (!string.IsNullOrWhiteSpace(filter.LastName))
             {
-                var ln = filter.LastName.ToUpper();
-                query = query.Where(u =>
-                    EF.Functions.Unaccent(u.LastName).ToUpper().Contains(EF.Functions.Unaccent(ln))
-                );
+                var ln = filter.LastName.ToLower();
+                query = query.Where(u => u.LastName.ToLower().Contains(ln));
             }
 
             if (filter.IsActive.HasValue)

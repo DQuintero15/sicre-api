@@ -76,10 +76,8 @@ public class PositionService(ILogger<PositionService> logger, ApplicationDbConte
 
             if (!string.IsNullOrWhiteSpace(filter.Name))
             {
-                var name = filter.Name.ToUpper();
-                query = query.Where(p =>
-                    EF.Functions.Unaccent(p.Name).ToUpper().Contains(EF.Functions.Unaccent(name))
-                );
+                var name = filter.Name.ToLower();
+                query = query.Where(p => p.Name.ToLower().Contains(name));
             }
 
             var total = await query.CountAsync();
