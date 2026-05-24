@@ -1,4 +1,5 @@
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 
 namespace Sicre.Api.Features.Reports.Dtos.Responses;
 
@@ -20,4 +21,10 @@ public class ReportSummaryResponse
     public DateOnly? EndDate { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public int TotalInstances { get; set; }
+    public int PendingInstances { get; set; }
+    public int OverdueInstances { get; set; }
+    public int CompletedInstances { get; set; }
+    public List<ReportInstanceSummaryResponse> Instances { get; set; } = [];
 }

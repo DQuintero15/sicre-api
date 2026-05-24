@@ -378,6 +378,11 @@ public class ReportInstanceService(
 
             await db.SaveChangesAsync(ct);
 
+            if (request.ResponsibleUserId.HasValue)
+                await db.Entry(instance).Reference(ri => ri.ResponsibleUser).LoadAsync(ct);
+            if (request.SupervisorUserId.HasValue)
+                await db.Entry(instance).Reference(ri => ri.SupervisorUser).LoadAsync(ct);
+
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
                 "Instancia de reporte actualizada exitosamente."

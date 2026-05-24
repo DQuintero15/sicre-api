@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Features.Reports.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
@@ -56,6 +57,7 @@ public class ReportService(
                 .Reports.Include(r => r.ControlEntity)
                 .Include(r => r.Branch)
                 .Include(r => r.Process)
+                .Include(r => r.Instances)
                 .AsQueryable();
 
             if (request.ControlEntityId.HasValue)
@@ -484,8 +486,10 @@ public class ReportService(
             UpdatedAt = r.UpdatedAt,
         };
 
-    private static ReportSummaryResponse ToSummary(Report r) =>
-        new()
+    private static ReportSummaryResponse ToSummary(Report r)
+    {
+        var instances = r.Instances.OrderBy(i => i.DueDate).ToList();
+        return new()
         {
             Id = r.Id,
             Code = r.Code,
@@ -503,5 +507,27 @@ public class ReportService(
             EndDate = r.EndDate,
             IsActive = r.IsActive,
             CreatedAt = r.CreatedAt,
+            TotalInstances = instances.Count,
+            PendingInstances = instances.Count(i => i.Status == ReportStatus.Pending),
+            OverdueInstances = instances.Count(i => i.Status == ReportStatus.Overdue),
+            CompletedInstances = instances.Count(i =>
+                i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
+            ),
+            Instances = instances
+                .Select(i => new ReportInstanceSummaryResponse
+                {
+                    Id = i.Id,
+                    ReportId = i.ReportId,
+                    PeriodName = i.PeriodName,
+                    PeriodYear = i.PeriodYear,
+                    PeriodMonth = i.PeriodMonth,
+                    DueDate = i.DueDate,
+                    Status = i.Status,
+                    EventDate = i.EventDate,
+                    SentDate = i.SentDate,
+                    CreatedAt = i.CreatedAt,
+                })
+                .ToList(),
         };
+    }
 }
