@@ -58,6 +58,9 @@ public class ReportService(
                 .Include(r => r.Branch)
                 .Include(r => r.Process)
                 .Include(r => r.Instances)
+                    .ThenInclude(i => i.ResponsibleUser)
+                .Include(r => r.Instances)
+                    .ThenInclude(i => i.SupervisorUser)
                 .AsQueryable();
 
             if (request.ControlEntityId.HasValue)
@@ -525,6 +528,14 @@ public class ReportService(
                     Status = i.Status,
                     EventDate = i.EventDate,
                     SentDate = i.SentDate,
+                    ResponsibleUserId = i.ResponsibleUserId,
+                    ResponsibleUserName = i.ResponsibleUser != null
+                        ? $"{i.ResponsibleUser.FirstName} {i.ResponsibleUser.LastName}"
+                        : null,
+                    SupervisorUserId = i.SupervisorUserId,
+                    SupervisorUserName = i.SupervisorUser != null
+                        ? $"{i.SupervisorUser.FirstName} {i.SupervisorUser.LastName}"
+                        : null,
                     CreatedAt = i.CreatedAt,
                 })
                 .ToList(),

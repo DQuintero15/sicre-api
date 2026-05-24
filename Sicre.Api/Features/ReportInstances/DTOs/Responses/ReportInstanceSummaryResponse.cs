@@ -15,5 +15,9 @@ public class ReportInstanceSummaryResponse
     public ReportStatus Status { get; set; }
     public DateOnly? EventDate { get; set; }
     public DateTime? SentDate { get; set; }
+    public Guid ResponsibleUserId { get; set; }
+    public string? ResponsibleUserName { get; set; }
+    public Guid SupervisorUserId { get; set; }
+    public string? SupervisorUserName { get; set; }
     public DateTime CreatedAt { get; set; }
 }
