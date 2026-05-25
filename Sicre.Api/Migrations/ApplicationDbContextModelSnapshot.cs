@@ -484,42 +484,21 @@ namespace Sicre.Api.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("DueDateDayNumber")
+                    b.Property<string>("DueDateDatesDefinition")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int?>("DueDateDay")
                         .HasColumnType("integer");
 
                     b.Property<int?>("DueDateDaysToAdd")
                         .HasColumnType("integer");
 
-                    b.Property<string>("DueDateExceptionsDefinition")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("DueDateFixedDatesDefinition")
-                        .HasColumnType("jsonb");
-
-                    b.Property<int?>("DueDateFixedDay")
+                    b.Property<int?>("DueDateMonth")
                         .HasColumnType("integer");
-
-                    b.Property<int?>("DueDateFixedMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("DueDateMonthOffset")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DueDatePeriodUnit")
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("DueDateRangesDefinition")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("DueDateRuleType")
                         .IsRequired()
                         .HasColumnType("varchar(50)");
-
-                    b.Property<DateOnly?>("DueDateSpecificDate")
-                        .HasColumnType("date");
-
-                    b.Property<int?>("DueDateYearOffset")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");

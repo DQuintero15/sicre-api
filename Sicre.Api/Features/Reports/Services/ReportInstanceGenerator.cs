@@ -22,8 +22,8 @@ public record ReportInstanceCandidate(
 public interface IReportInstanceGenerator
 {
     /// <summary>
-    /// Returns the next period candidate for the Hangfire rolling-horizon job.
-    /// Returns null if the report is not auto-generable or there is nothing to generate yet.
+    /// Returns the next due-date candidate for the Hangfire rolling job.
+    /// Returns null if the report is not auto-generable or nothing remains in the horizon.
     /// </summary>
     ReportInstanceCandidate? GetNextCandidate(
         Report report,
@@ -32,7 +32,8 @@ public interface IReportInstanceGenerator
     );
 
     /// <summary>
-    /// Returns all candidates that fall inside the given window (used for 12-month projection).
+    /// Returns all candidates whose DueDate falls inside [windowStart, windowEnd].
+    /// Used for the 12-month initial projection.
     /// </summary>
     IReadOnlyList<ReportInstanceCandidate> GetCandidatesInWindow(
         Report report,
@@ -72,66 +73,21 @@ public class ReportInstanceGenerator(ILogger<ReportInstanceGenerator> logger)
         DateOnly goLiveDate
     )
     {
-        if (!IsAutogenerableReport(report))
+        if (!IsAutoGenerable(report))
             return null;
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var effectiveStart = ComputeEffectiveStart(report, goLiveDate);
         var horizon = GetRollingHorizon(report.Frequency, today);
 
-        DateOnly cursor = latestInstance is null ? today : latestInstance.PeriodEnd.AddDays(1);
+        // Search from the later of effectiveStart or the day after the last known due date
+        var searchFrom = latestInstance is null
+            ? effectiveStart
+            : Max(effectiveStart, latestInstance.DueDate.AddDays(1));
 
-        if (report.DueDateRuleType is ReportDueDateRuleType.FixedDateSet)
-            return GetNextFixedDateCandidate(report, latestInstance, cursor, horizon, goLiveDate);
-
-        if (report.DueDateRuleType is ReportDueDateRuleType.DateRangeSet)
-            return GetNextDateRangeCandidate(report, latestInstance, cursor, horizon, goLiveDate);
-
-        // Standard periodic — loop until we find a valid candidate or exceed the horizon
-        var currentCursor = cursor;
-        while (true)
-        {
-            var (periodStart, periodEnd) = ComputePeriodBoundsFromCursor(
-                report.Frequency,
-                currentCursor
-            );
-            var dueDate = ComputeDueDate(report, periodStart, periodEnd);
-            if (dueDate is null)
-                return null;
-            if (dueDate.Value > horizon)
-                return null;
-
-            // Skip periods whose end precedes the report's start date
-            if (periodEnd < report.StartDate)
-            {
-                currentCursor = AdvanceCursorByFrequency(report.Frequency, periodEnd);
-                continue;
-            }
-
-            // Stop if the report has expired
-            if (report.EndDate.HasValue && periodStart > report.EndDate.Value)
-                return null;
-
-            // Skip if DueDate falls before SICRE's operational start
-            if (dueDate.Value < goLiveDate)
-            {
-                currentCursor = AdvanceCursorByFrequency(report.Frequency, periodEnd);
-                continue;
-            }
-
-            var (periodYear, periodMonth) = GetPeriodYearMonth(report.Frequency, periodStart);
-            var periodName = BuildPeriodName(report.Frequency, periodStart, periodMonth);
-
-            return new ReportInstanceCandidate(
-                report.Id,
-                periodYear,
-                periodMonth,
-                periodName,
-                periodStart,
-                periodEnd,
-                dueDate.Value,
-                null
-            );
-        }
+        return GenerateCandidates(report, searchFrom, horizon)
+            .OrderBy(c => c.DueDate)
+            .FirstOrDefault();
     }
 
     public IReadOnlyList<ReportInstanceCandidate> GetCandidatesInWindow(
@@ -141,80 +97,33 @@ public class ReportInstanceGenerator(ILogger<ReportInstanceGenerator> logger)
         DateOnly goLiveDate
     )
     {
-        var results = new List<ReportInstanceCandidate>();
+        if (!IsAutoGenerable(report))
+            return [];
 
-        if (report.Frequency is ReportFrequency.Eventual)
-            return results;
+        var effectiveStart = ComputeEffectiveStart(report, goLiveDate);
+        var from = Max(windowStart, effectiveStart);
 
-        if (report.DueDateRuleType is ReportDueDateRuleType.FixedDateSet)
-        {
-            results.AddRange(
-                GetFixedDateCandidatesInWindow(report, windowStart, windowEnd, goLiveDate)
-            );
-            return results;
-        }
-
-        if (report.DueDateRuleType is ReportDueDateRuleType.DateRangeSet)
-        {
-            results.AddRange(
-                GetDateRangeCandidatesInWindow(report, windowStart, windowEnd, goLiveDate)
-            );
-            return results;
-        }
-
-        if (
-            report.DueDateRuleType
-            is ReportDueDateRuleType.DaysAfterEvent
-                or ReportDueDateRuleType.ManualDateRequired
-        )
-            return results;
-
-        var cursor = windowStart;
-        while (cursor <= windowEnd)
-        {
-            var (periodStart, periodEnd) = ComputePeriodBoundsFromCursor(report.Frequency, cursor);
-
-            // Stop if the report has expired
-            if (report.EndDate.HasValue && periodStart > report.EndDate.Value)
-                break;
-
-            var dueDate = ComputeDueDate(report, periodStart, periodEnd);
-            if (
-                dueDate is not null
-                && dueDate.Value >= windowStart
-                && dueDate.Value <= windowEnd
-                && dueDate.Value >= goLiveDate
-                && periodEnd >= report.StartDate
-            )
-            {
-                var (periodYear, periodMonth) = GetPeriodYearMonth(report.Frequency, periodStart);
-                var periodName = BuildPeriodName(report.Frequency, periodStart, periodMonth);
-                results.Add(
-                    new ReportInstanceCandidate(
-                        report.Id,
-                        periodYear,
-                        periodMonth,
-                        periodName,
-                        periodStart,
-                        periodEnd,
-                        dueDate.Value,
-                        null
-                    )
-                );
-            }
-
-            cursor = AdvanceCursorByFrequency(report.Frequency, periodEnd);
-        }
-
-        return results;
+        return GenerateCandidates(report, from, windowEnd).OrderBy(c => c.DueDate).ToList();
     }
+
+    // ── Effective start ───────────────────────────────────────────────────────
+
+    private static DateOnly ComputeEffectiveStart(Report report, DateOnly goLiveDate)
+    {
+        // SICRE operational start = first day of the month AFTER GoLiveDate
+        var operationalStart = new DateOnly(goLiveDate.Year, goLiveDate.Month, 1).AddMonths(1);
+        // Report legal start = first day of the report's StartDate month
+        var reportStart = new DateOnly(report.StartDate.Year, report.StartDate.Month, 1);
+        return Max(operationalStart, reportStart);
+    }
+
+    private static DateOnly Max(DateOnly a, DateOnly b) => a > b ? a : b;
 
     // ── Auto-generable check ──────────────────────────────────────────────────
 
-    private static bool IsAutogenerableReport(Report report) =>
+    private static bool IsAutoGenerable(Report report) =>
         report.GenerationMode == ReportGenerationMode.Automatic
         && report.Frequency != ReportFrequency.Eventual
-        && report.DueDateRuleType != ReportDueDateRuleType.DaysAfterEvent
         && report.DueDateRuleType != ReportDueDateRuleType.ManualDateRequired;
 
     // ── Rolling horizon ───────────────────────────────────────────────────────
@@ -229,485 +138,217 @@ public class ReportInstanceGenerator(ILogger<ReportInstanceGenerator> logger)
             _ => today.AddMonths(2),
         };
 
-    // ── Period bounds computation ─────────────────────────────────────────────
+    // ── Candidate generation ──────────────────────────────────────────────────
 
-    private static (DateOnly start, DateOnly end) ComputePeriodBoundsFromCursor(
-        ReportFrequency frequency,
-        DateOnly cursor
+    private IEnumerable<ReportInstanceCandidate> GenerateCandidates(
+        Report report,
+        DateOnly from,
+        DateOnly to
     ) =>
-        frequency switch
-        {
-            ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated => (
-                new DateOnly(cursor.Year, cursor.Month, 1),
-                new DateOnly(
-                    cursor.Year,
-                    cursor.Month,
-                    DateTime.DaysInMonth(cursor.Year, cursor.Month)
-                )
-            ),
-
-            ReportFrequency.Quarterly => ComputeQuarterBounds(cursor),
-
-            ReportFrequency.SemiAnnual => ComputeSemesterBounds(cursor),
-
-            ReportFrequency.Annual => (
-                new DateOnly(cursor.Year, 1, 1),
-                new DateOnly(cursor.Year, 12, 31)
-            ),
-
-            _ => (cursor, cursor),
-        };
-
-    private static (DateOnly start, DateOnly end) ComputeQuarterBounds(DateOnly cursor)
-    {
-        var q = (cursor.Month - 1) / 3;
-        var startMonth = q * 3 + 1;
-        var endMonth = startMonth + 2;
-        return (
-            new DateOnly(cursor.Year, startMonth, 1),
-            new DateOnly(cursor.Year, endMonth, DateTime.DaysInMonth(cursor.Year, endMonth))
-        );
-    }
-
-    private static (DateOnly start, DateOnly end) ComputeSemesterBounds(DateOnly cursor)
-    {
-        var s = cursor.Month <= 6 ? 0 : 1;
-        var startMonth = s * 6 + 1;
-        var endMonth = startMonth + 5;
-        return (
-            new DateOnly(cursor.Year, startMonth, 1),
-            new DateOnly(cursor.Year, endMonth, DateTime.DaysInMonth(cursor.Year, endMonth))
-        );
-    }
-
-    private static DateOnly AdvanceCursorByFrequency(ReportFrequency frequency, DateOnly periodEnd) =>
-        periodEnd.AddDays(1);
-
-    // ── PeriodYear / PeriodMonth ──────────────────────────────────────────────
-
-    private static (int year, int? month) GetPeriodYearMonth(
-        ReportFrequency frequency,
-        DateOnly periodStart
-    ) =>
-        frequency switch
-        {
-            ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated => (
-                periodStart.Year,
-                periodStart.Month
-            ),
-            ReportFrequency.Quarterly => (periodStart.Year, periodStart.Month),
-            ReportFrequency.SemiAnnual => (periodStart.Year, periodStart.Month),
-            ReportFrequency.Annual => (periodStart.Year, 1),
-            _ => (periodStart.Year, null),
-        };
-
-    // ── PeriodName ────────────────────────────────────────────────────────────
-
-    private static string BuildPeriodName(
-        ReportFrequency frequency,
-        DateOnly periodStart,
-        int? periodMonth
-    ) =>
-        frequency switch
-        {
-            ReportFrequency.Monthly
-            or ReportFrequency.MonthlyAnticipated =>
-                $"{SpanishMonths[periodStart.Month]} {periodStart.Year}",
-
-            ReportFrequency.Quarterly =>
-                $"T{((periodStart.Month - 1) / 3) + 1} {periodStart.Year}",
-
-            ReportFrequency.SemiAnnual =>
-                $"S{(periodStart.Month <= 6 ? 1 : 2)} {periodStart.Year}",
-
-            ReportFrequency.Annual => $"Anual {periodStart.Year}",
-
-            _ => $"Periodo {periodStart.Year}",
-        };
-
-    // ── DueDate computation ───────────────────────────────────────────────────
-
-    private DateOnly? ComputeDueDate(Report report, DateOnly periodStart, DateOnly periodEnd) =>
         report.DueDateRuleType switch
         {
-            ReportDueDateRuleType.DayNumberOfPeriod => ComputeDayNumberOfPeriod(
-                report,
-                periodStart
-            ),
-
-            ReportDueDateRuleType.LastDayOfPeriod => ComputeLastDayOfPeriod(report, periodStart),
-
-            ReportDueDateRuleType.DaysAfterPeriodEnd => report.DueDateDaysToAdd.HasValue
-                ? periodEnd.AddDays(report.DueDateDaysToAdd.Value)
-                : null,
-
-            ReportDueDateRuleType.DaysAfterEvent => null,
-
-            ReportDueDateRuleType.FixedDateSet => null,
-
-            ReportDueDateRuleType.DateRangeSet => null,
-
-            ReportDueDateRuleType.SpecificDate => report.DueDateSpecificDate,
-
-            ReportDueDateRuleType.ManualDateRequired => null,
-
-            _ => null,
+            ReportDueDateRuleType.DayOfMonth => GenerateMonthlyDayOfMonth(report, from, to),
+            ReportDueDateRuleType.LastDayOfMonth => GenerateMonthlyLastDay(report, from, to),
+            ReportDueDateRuleType.FixedDate => GenerateFixedDate(report, from, to),
+            ReportDueDateRuleType.FixedDates => GenerateFixedDates(report, from, to),
+            _ => [],
         };
 
-    private static DateOnly? ComputeDayNumberOfPeriod(Report report, DateOnly periodStart)
-    {
-        if (!report.DueDateDayNumber.HasValue)
-            return null;
+    // ── DayOfMonth ────────────────────────────────────────────────────────────
 
-        var monthOffset = report.DueDateMonthOffset ?? 0;
-        var targetTotalMonth = periodStart.Month + monthOffset;
-        var targetYear = periodStart.Year + (targetTotalMonth - 1) / 12;
-        var targetMonth = ((targetTotalMonth - 1) % 12) + 1;
-
-        var daysInTargetMonth = DateTime.DaysInMonth(targetYear, targetMonth);
-        var day = Math.Min(report.DueDateDayNumber.Value, daysInTargetMonth);
-
-        return new DateOnly(targetYear, targetMonth, day);
-    }
-
-    private static DateOnly? ComputeLastDayOfPeriod(Report report, DateOnly periodStart)
-    {
-        var monthOffset = report.DueDateMonthOffset ?? 0;
-        var targetTotalMonth = periodStart.Month + monthOffset;
-        var targetYear = periodStart.Year + (targetTotalMonth - 1) / 12;
-        var targetMonth = ((targetTotalMonth - 1) % 12) + 1;
-
-        var lastDay = DateTime.DaysInMonth(targetYear, targetMonth);
-        return new DateOnly(targetYear, targetMonth, lastDay);
-    }
-
-    // ── FixedDateSet logic ────────────────────────────────────────────────────
-
-    private ReportInstanceCandidate? GetNextFixedDateCandidate(
+    private static IEnumerable<ReportInstanceCandidate> GenerateMonthlyDayOfMonth(
         Report report,
-        ReportInstance? latestInstance,
-        DateOnly cursor,
-        DateOnly horizon,
-        DateOnly goLiveDate
+        DateOnly from,
+        DateOnly to
     )
     {
-        var items = ParseFixedDates(report);
-        if (items is null)
-            return null;
+        if (!report.DueDateDay.HasValue)
+            yield break;
 
-        for (var year = cursor.Year; year <= horizon.Year + 1; year++)
+        var cursor = new DateOnly(from.Year, from.Month, 1);
+        while (cursor <= to)
         {
-            foreach (var item in items.OrderBy(x => x.Month).ThenBy(x => x.Day))
+            var daysInMonth = DateTime.DaysInMonth(cursor.Year, cursor.Month);
+            var day = Math.Min(report.DueDateDay.Value, daysInMonth);
+            var dueDate = new DateOnly(cursor.Year, cursor.Month, day);
+
+            if (dueDate >= from && dueDate <= to)
             {
-                var (candidate, _) = BuildFixedDateCandidate(report, item, year);
-                if (candidate is null)
-                    continue;
-
-                if (candidate.DueDate < cursor)
-                    continue;
-                if (candidate.DueDate > horizon)
-                    return null;
-
-                if (candidate.PeriodEnd < report.StartDate)
-                    continue;
-                if (report.EndDate.HasValue && candidate.PeriodStart > report.EndDate.Value)
-                    continue;
-                if (candidate.DueDate < goLiveDate)
-                    continue;
-
-                if (
-                    latestInstance is not null
-                    && latestInstance.PeriodYear == candidate.PeriodYear
-                    && latestInstance.PeriodMonth == candidate.PeriodMonth
-                )
-                    continue;
-
-                return candidate;
+                if (!report.EndDate.HasValue || dueDate <= report.EndDate.Value)
+                    yield return BuildMonthlyCandidate(report, dueDate);
             }
-        }
 
-        return null;
+            cursor = cursor.AddMonths(1);
+        }
     }
 
-    private IReadOnlyList<ReportInstanceCandidate> GetFixedDateCandidatesInWindow(
+    // ── LastDayOfMonth ────────────────────────────────────────────────────────
+
+    private static IEnumerable<ReportInstanceCandidate> GenerateMonthlyLastDay(
         Report report,
-        DateOnly windowStart,
-        DateOnly windowEnd,
-        DateOnly goLiveDate
+        DateOnly from,
+        DateOnly to
     )
     {
-        var items = ParseFixedDates(report);
-        if (items is null)
-            return [];
-
-        var results = new List<ReportInstanceCandidate>();
-
-        for (var year = windowStart.Year; year <= windowEnd.Year + 1; year++)
+        var cursor = new DateOnly(from.Year, from.Month, 1);
+        while (cursor <= to)
         {
-            foreach (var item in items.OrderBy(x => x.Month).ThenBy(x => x.Day))
+            var lastDay = DateTime.DaysInMonth(cursor.Year, cursor.Month);
+            var dueDate = new DateOnly(cursor.Year, cursor.Month, lastDay);
+
+            if (dueDate >= from && dueDate <= to)
             {
-                var (candidate, _) = BuildFixedDateCandidate(report, item, year);
-                if (candidate is null)
-                    continue;
-                if (
-                    candidate.DueDate >= windowStart
-                    && candidate.DueDate <= windowEnd
-                    && candidate.DueDate >= goLiveDate
-                    && candidate.PeriodEnd >= report.StartDate
-                    && (!report.EndDate.HasValue || candidate.PeriodStart <= report.EndDate.Value)
-                )
-                    results.Add(candidate);
+                if (!report.EndDate.HasValue || dueDate <= report.EndDate.Value)
+                    yield return BuildMonthlyCandidate(report, dueDate);
             }
-        }
 
-        return results;
+            cursor = cursor.AddMonths(1);
+        }
     }
 
-    private (ReportInstanceCandidate? candidate, int dueDateYear) BuildFixedDateCandidate(
-        Report report,
-        FixedDateItem item,
-        int year
-    )
+    private static ReportInstanceCandidate BuildMonthlyCandidate(Report report, DateOnly dueDate)
     {
-        var daysInMonth = DateTime.DaysInMonth(year, item.Month);
-        if (item.Day > daysInMonth)
-            return (null, year);
-
-        var dueDate = new DateOnly(year, item.Month, item.Day);
-        int periodYear = year;
-        int? periodMonth;
-        string periodName;
-
-        if (item.ReportedQuarter.HasValue)
-        {
-            var periodYearOffset = item.PeriodYearOffset ?? 0;
-            periodYear = year + periodYearOffset;
-            var quarterFirstMonth = (item.ReportedQuarter.Value - 1) * 3 + 1;
-            periodMonth = quarterFirstMonth;
-            periodName = $"T{item.ReportedQuarter.Value} {periodYear}";
-        }
-        else if (item.ReportedSemester.HasValue)
-        {
-            var periodYearOffset = item.PeriodYearOffset ?? 0;
-            periodYear = year + periodYearOffset;
-            var semesterFirstMonth = (item.ReportedSemester.Value - 1) * 6 + 1;
-            periodMonth = semesterFirstMonth;
-            periodName = $"S{item.ReportedSemester.Value} {periodYear}";
-        }
-        else
-        {
-            periodMonth = item.Month;
-            periodName = $"Periodo {item.Month}/{year}";
-        }
-
-        var periodDate = new DateOnly(year, item.Month, item.Day);
-        return (
-            new ReportInstanceCandidate(
-                report.Id,
-                periodYear,
-                periodMonth,
-                periodName,
-                periodDate,
-                periodDate,
-                dueDate,
-                null
-            ),
-            year
+        var periodStart = new DateOnly(dueDate.Year, dueDate.Month, 1);
+        var periodEnd = new DateOnly(
+            dueDate.Year,
+            dueDate.Month,
+            DateTime.DaysInMonth(dueDate.Year, dueDate.Month)
         );
-    }
-
-    private List<FixedDateItem>? ParseFixedDates(Report report)
-    {
-        if (!string.IsNullOrWhiteSpace(report.DueDateFixedDatesDefinition))
-        {
-            try
-            {
-                var items = JsonSerializer.Deserialize<List<FixedDateItem>>(
-                    report.DueDateFixedDatesDefinition,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                );
-                return items;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(
-                    ex,
-                    "Report {ReportId}: invalid DueDateFixedDatesDefinition JSON: {Json}",
-                    report.Id,
-                    report.DueDateFixedDatesDefinition
-                );
-                return null;
-            }
-        }
-
-        if (report.DueDateFixedMonth.HasValue && report.DueDateFixedDay.HasValue)
-        {
-            return
-            [
-                new FixedDateItem
-                {
-                    Month = report.DueDateFixedMonth.Value,
-                    Day = report.DueDateFixedDay.Value,
-                },
-            ];
-        }
-
-        return null;
-    }
-
-    // ── DateRangeSet logic ────────────────────────────────────────────────────
-
-    private ReportInstanceCandidate? GetNextDateRangeCandidate(
-        Report report,
-        ReportInstance? latestInstance,
-        DateOnly cursor,
-        DateOnly horizon,
-        DateOnly goLiveDate
-    )
-    {
-        var ranges = ParseDateRanges(report);
-        if (ranges is null)
-            return null;
-
-        for (var year = cursor.Year; year <= horizon.Year + 1; year++)
-        {
-            foreach (var range in ranges.OrderBy(x => x.EndMonth).ThenBy(x => x.EndDay))
-            {
-                var candidate = BuildDateRangeCandidate(report, range, year);
-                if (candidate is null)
-                    continue;
-
-                if (candidate.DueDate < cursor)
-                    continue;
-                if (candidate.DueDate > horizon)
-                    return null;
-
-                if (candidate.PeriodEnd < report.StartDate)
-                    continue;
-                if (report.EndDate.HasValue && candidate.PeriodStart > report.EndDate.Value)
-                    continue;
-                if (candidate.DueDate < goLiveDate)
-                    continue;
-
-                if (
-                    latestInstance is not null
-                    && latestInstance.PeriodYear == candidate.PeriodYear
-                    && latestInstance.PeriodMonth == candidate.PeriodMonth
-                )
-                    continue;
-
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private IReadOnlyList<ReportInstanceCandidate> GetDateRangeCandidatesInWindow(
-        Report report,
-        DateOnly windowStart,
-        DateOnly windowEnd,
-        DateOnly goLiveDate
-    )
-    {
-        var ranges = ParseDateRanges(report);
-        if (ranges is null)
-            return [];
-
-        var results = new List<ReportInstanceCandidate>();
-
-        for (var year = windowStart.Year; year <= windowEnd.Year + 1; year++)
-        {
-            foreach (var range in ranges.OrderBy(x => x.EndMonth).ThenBy(x => x.EndDay))
-            {
-                var candidate = BuildDateRangeCandidate(report, range, year);
-                if (candidate is null)
-                    continue;
-                if (
-                    candidate.DueDate >= windowStart
-                    && candidate.DueDate <= windowEnd
-                    && candidate.DueDate >= goLiveDate
-                    && candidate.PeriodEnd >= report.StartDate
-                    && (!report.EndDate.HasValue || candidate.PeriodStart <= report.EndDate.Value)
-                )
-                    results.Add(candidate);
-            }
-        }
-
-        return results;
-    }
-
-    private static ReportInstanceCandidate? BuildDateRangeCandidate(
-        Report report,
-        DateRangeItem range,
-        int year
-    )
-    {
-        var endDaysInMonth = DateTime.DaysInMonth(year, range.EndMonth);
-        if (range.EndDay > endDaysInMonth)
-            return null;
-
-        var startDaysInMonth = DateTime.DaysInMonth(year, range.StartMonth);
-        if (range.StartDay > startDaysInMonth)
-            return null;
-
-        var periodStart = new DateOnly(year, range.StartMonth, range.StartDay);
-        var dueDate = new DateOnly(year, range.EndMonth, range.EndDay);
-        var periodName = $"Período {range.StartMonth}-{range.EndMonth}/{year}";
-
+        var periodName = $"{SpanishMonths[dueDate.Month]} {dueDate.Year}";
         return new ReportInstanceCandidate(
             report.Id,
-            year,
-            range.StartMonth,
+            dueDate.Year,
+            dueDate.Month,
             periodName,
             periodStart,
-            dueDate,
+            periodEnd,
             dueDate,
             null
         );
     }
 
-    private List<DateRangeItem>? ParseDateRanges(Report report)
+    // ── FixedDate (annual single date) ────────────────────────────────────────
+
+    private static IEnumerable<ReportInstanceCandidate> GenerateFixedDate(
+        Report report,
+        DateOnly from,
+        DateOnly to
+    )
     {
-        if (string.IsNullOrWhiteSpace(report.DueDateRangesDefinition))
+        if (!report.DueDateDay.HasValue || !report.DueDateMonth.HasValue)
+            yield break;
+
+        for (var year = from.Year; year <= to.Year + 1; year++)
+        {
+            var daysInMonth = DateTime.DaysInMonth(year, report.DueDateMonth.Value);
+            var day = Math.Min(report.DueDateDay.Value, daysInMonth);
+            var dueDate = new DateOnly(year, report.DueDateMonth.Value, day);
+
+            if (dueDate < from)
+                continue;
+            if (dueDate > to)
+                yield break;
+            if (report.EndDate.HasValue && dueDate > report.EndDate.Value)
+                yield break;
+
+            var periodStart = new DateOnly(dueDate.Year, 1, 1);
+            var periodEnd = new DateOnly(dueDate.Year, 12, 31);
+            var periodName = $"Anual {dueDate.Year}";
+
+            yield return new ReportInstanceCandidate(
+                report.Id,
+                dueDate.Year,
+                1,
+                periodName,
+                periodStart,
+                periodEnd,
+                dueDate,
+                null
+            );
+        }
+    }
+
+    // ── FixedDates (multiple fixed dates per year, e.g. IFE1) ─────────────────
+
+    private IEnumerable<ReportInstanceCandidate> GenerateFixedDates(
+        Report report,
+        DateOnly from,
+        DateOnly to
+    )
+    {
+        var items = ParseDatesDefinition(report);
+        if (items is null)
+            yield break;
+
+        var ordered = items.OrderBy(x => x.Month).ThenBy(x => x.Day).ToList();
+
+        for (var year = from.Year; year <= to.Year + 1; year++)
+        {
+            foreach (var item in ordered)
+            {
+                var daysInMonth = DateTime.DaysInMonth(year, item.Month);
+                if (item.Day > daysInMonth)
+                    continue;
+
+                var dueDate = new DateOnly(year, item.Month, item.Day);
+
+                if (dueDate < from)
+                    continue;
+                if (dueDate > to)
+                    yield break;
+                if (report.EndDate.HasValue && dueDate > report.EndDate.Value)
+                    yield break;
+
+                var periodStart = new DateOnly(dueDate.Year, dueDate.Month, 1);
+                var periodEnd = new DateOnly(
+                    dueDate.Year,
+                    dueDate.Month,
+                    DateTime.DaysInMonth(dueDate.Year, dueDate.Month)
+                );
+                var periodName = $"{SpanishMonths[dueDate.Month]} {dueDate.Year}";
+
+                yield return new ReportInstanceCandidate(
+                    report.Id,
+                    dueDate.Year,
+                    dueDate.Month,
+                    periodName,
+                    periodStart,
+                    periodEnd,
+                    dueDate,
+                    null
+                );
+            }
+        }
+    }
+
+    // ── JSON parsing ──────────────────────────────────────────────────────────
+
+    private List<FixedDateItem>? ParseDatesDefinition(Report report)
+    {
+        if (string.IsNullOrWhiteSpace(report.DueDateDatesDefinition))
             return null;
 
         try
         {
-            var ranges = JsonSerializer.Deserialize<List<DateRangeItem>>(
-                report.DueDateRangesDefinition,
+            return JsonSerializer.Deserialize<List<FixedDateItem>>(
+                report.DueDateDatesDefinition,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
-            return ranges;
         }
         catch (Exception ex)
         {
             logger.LogError(
                 ex,
-                "Report {ReportId}: invalid DueDateRangesDefinition JSON: {Json}",
-                report.Id,
-                report.DueDateRangesDefinition
+                "Report {ReportId}: invalid DueDateDatesDefinition JSON",
+                report.Id
             );
             return null;
         }
     }
 
-    // ── JSON helper record types ──────────────────────────────────────────────
-
     private sealed record FixedDateItem
     {
         public int Month { get; init; }
         public int Day { get; init; }
-        public int? ReportedQuarter { get; init; }
-        public int? ReportedSemester { get; init; }
-        public int? PeriodYearOffset { get; init; }
-    }
-
-    private sealed record DateRangeItem
-    {
-        public int StartMonth { get; init; }
-        public int StartDay { get; init; }
-        public int EndMonth { get; init; }
-        public int EndDay { get; init; }
     }
 }

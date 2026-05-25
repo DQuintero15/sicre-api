@@ -17,15 +17,9 @@ public class ReportResponse
     public ReportFrequency Frequency { get; set; }
     public ReportGenerationMode GenerationMode { get; set; }
     public ReportDueDateRuleType DueDateRuleType { get; set; }
-    public int? DueDateDayNumber { get; set; }
-    public int? DueDateDaysToAdd { get; set; }
-    public int? DueDateMonthOffset { get; set; }
-    public int? DueDateYearOffset { get; set; }
-    public int? DueDateFixedMonth { get; set; }
-    public int? DueDateFixedDay { get; set; }
-    public DateOnly? DueDateSpecificDate { get; set; }
-    public string? DueDateFixedDatesDefinition { get; set; }
-    public string? DueDateRangesDefinition { get; set; }
+    public int? DueDateDay { get; set; }
+    public int? DueDateMonth { get; set; }
+    public string? DueDateDatesDefinition { get; set; }
     public string? OriginalDueDateText { get; set; }
     public int AlertEarlyDays { get; set; }
     public int AlertFollowUpDays { get; set; }

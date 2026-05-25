@@ -49,7 +49,6 @@ public class ReportGenerationJobService(
                 r.IsActive
                 && r.GenerationMode == ReportGenerationMode.Automatic
                 && r.Frequency != ReportFrequency.Eventual
-                && r.DueDateRuleType != ReportDueDateRuleType.DaysAfterEvent
                 && r.DueDateRuleType != ReportDueDateRuleType.ManualDateRequired
             )
             .ToListAsync(ct);
@@ -69,7 +68,11 @@ public class ReportGenerationJobService(
                     .ThenByDescending(i => i.PeriodMonth)
                     .FirstOrDefaultAsync(ct);
 
-                var candidate = generator.GetNextCandidate(report, latest, settings.GoLiveDate.Value);
+                var candidate = generator.GetNextCandidate(
+                    report,
+                    latest,
+                    settings.GoLiveDate.Value
+                );
                 if (candidate is null)
                     continue;
 

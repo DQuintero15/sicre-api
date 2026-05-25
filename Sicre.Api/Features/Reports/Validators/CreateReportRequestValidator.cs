@@ -30,83 +30,47 @@ public class CreateReportRequestValidator : AbstractValidator<CreateReportReques
         RuleFor(x => x.StartDate).NotEmpty().WithMessage("La fecha de inicio es requerida.");
 
         When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.DayNumberOfPeriod,
+            x => x.DueDateRuleType == ReportDueDateRuleType.DayOfMonth,
             () =>
             {
-                RuleFor(x => x.DueDateDayNumber)
+                RuleFor(x => x.DueDateDay)
                     .NotNull()
-                    .WithMessage("El número de día del periodo es requerido.")
+                    .WithMessage("El día del mes es requerido.")
                     .InclusiveBetween(1, 31)
-                    .WithMessage("El número de día debe estar entre 1 y 31.");
+                    .WithMessage("El día debe estar entre 1 y 31.");
             }
         );
 
         When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.DaysAfterPeriodEnd,
+            x => x.DueDateRuleType == ReportDueDateRuleType.FixedDate,
             () =>
             {
-                RuleFor(x => x.DueDateDaysToAdd)
+                RuleFor(x => x.DueDateDay)
                     .NotNull()
-                    .WithMessage("Los días a agregar son requeridos.")
-                    .GreaterThan(0)
-                    .WithMessage("Los días a agregar deben ser mayores a 0.");
-            }
-        );
-
-        When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.DaysAfterEvent,
-            () =>
-            {
-                RuleFor(x => x.DueDateDaysToAdd)
+                    .WithMessage("El día de la fecha fija es requerido.")
+                    .InclusiveBetween(1, 31)
+                    .WithMessage("El día debe estar entre 1 y 31.");
+                RuleFor(x => x.DueDateMonth)
                     .NotNull()
-                    .WithMessage("Los días a agregar son requeridos.")
-                    .GreaterThanOrEqualTo(0)
-                    .WithMessage("Los días a agregar deben ser mayores o iguales a 0.");
+                    .WithMessage("El mes de la fecha fija es requerido.")
+                    .InclusiveBetween(1, 12)
+                    .WithMessage("El mes debe estar entre 1 y 12.");
             }
         );
 
         When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.FixedDateSet,
+            x => x.DueDateRuleType == ReportDueDateRuleType.FixedDates,
             () =>
             {
-                RuleFor(x => x)
-                    .Must(x =>
-                        !string.IsNullOrWhiteSpace(x.DueDateFixedDatesDefinition)
-                        || (x.DueDateFixedMonth.HasValue && x.DueDateFixedDay.HasValue)
-                    )
-                    .WithMessage(
-                        "FixedDateSet requiere DueDateFixedDatesDefinition (JSON) o DueDateFixedMonth + DueDateFixedDay."
-                    );
-
-                RuleFor(x => x.DueDateFixedDatesDefinition)
-                    .Must(BeValidJson)
-                    .When(x => !string.IsNullOrWhiteSpace(x.DueDateFixedDatesDefinition))
-                    .WithMessage("La definición de fechas fijas debe ser JSON válido.");
-            }
-        );
-
-        When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.DateRangeSet,
-            () =>
-            {
-                RuleFor(x => x.DueDateRangesDefinition)
+                RuleFor(x => x.DueDateDatesDefinition)
                     .NotEmpty()
-                    .WithMessage("La definición de rangos de fechas es requerida.")
+                    .WithMessage("La definición de fechas es requerida.")
                     .Must(BeValidJson)
-                    .WithMessage("La definición de rangos de fechas debe ser JSON válido.");
+                    .WithMessage(
+                        "La definición de fechas debe ser JSON válido con formato [{\"month\":N,\"day\":N}]."
+                    );
             }
         );
-
-        When(
-            x => x.DueDateRuleType == ReportDueDateRuleType.SpecificDate,
-            () =>
-            {
-                RuleFor(x => x.DueDateSpecificDate)
-                    .NotNull()
-                    .WithMessage("La fecha específica de vencimiento es requerida.");
-            }
-        );
-
     }
 
     private static bool BeValidJson(string? value)

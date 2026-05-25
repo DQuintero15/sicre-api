@@ -13,16 +13,17 @@ public class CreateReportRequest
     public ReportFrequency Frequency { get; set; }
     public ReportGenerationMode GenerationMode { get; set; }
     public ReportDueDateRuleType DueDateRuleType { get; set; }
-    public int? DueDateDayNumber { get; set; }
-    public int? DueDateDaysToAdd { get; set; }
-    public int? DueDateMonthOffset { get; set; }
-    public int? DueDateYearOffset { get; set; }
-    public int? DueDateFixedMonth { get; set; }
-    public int? DueDateFixedDay { get; set; }
-    public DateOnly? DueDateSpecificDate { get; set; }
-    public string? DueDateFixedDatesDefinition { get; set; }
-    public string? DueDateRangesDefinition { get; set; }
+
+    // DayOfMonth + FixedDate
+    public int? DueDateDay { get; set; }
+
+    // FixedDate only
+    public int? DueDateMonth { get; set; }
+
+    // FixedDates: JSON [{month, day}]
+    public string? DueDateDatesDefinition { get; set; }
     public string? OriginalDueDateText { get; set; }
+
     public int AlertEarlyDays { get; set; }
     public int AlertFollowUpDays { get; set; }
     public int AlertCriticalDays { get; set; }

@@ -183,15 +183,9 @@ public class ReportService(
                 Frequency = request.Frequency,
                 GenerationMode = request.GenerationMode,
                 DueDateRuleType = request.DueDateRuleType,
-                DueDateDayNumber = request.DueDateDayNumber,
-                DueDateDaysToAdd = request.DueDateDaysToAdd,
-                DueDateMonthOffset = request.DueDateMonthOffset,
-                DueDateYearOffset = request.DueDateYearOffset,
-                DueDateFixedMonth = request.DueDateFixedMonth,
-                DueDateFixedDay = request.DueDateFixedDay,
-                DueDateSpecificDate = request.DueDateSpecificDate,
-                DueDateFixedDatesDefinition = request.DueDateFixedDatesDefinition,
-                DueDateRangesDefinition = request.DueDateRangesDefinition,
+                DueDateDay = request.DueDateDay,
+                DueDateMonth = request.DueDateMonth,
+                DueDateDatesDefinition = request.DueDateDatesDefinition,
                 OriginalDueDateText = request.OriginalDueDateText,
                 AlertEarlyDays = request.AlertEarlyDays,
                 AlertFollowUpDays = request.AlertFollowUpDays,
@@ -283,24 +277,12 @@ public class ReportService(
                 report.GenerationMode = request.GenerationMode.Value;
             if (request.DueDateRuleType.HasValue)
                 report.DueDateRuleType = request.DueDateRuleType.Value;
-            if (request.DueDateDayNumber.HasValue)
-                report.DueDateDayNumber = request.DueDateDayNumber;
-            if (request.DueDateDaysToAdd.HasValue)
-                report.DueDateDaysToAdd = request.DueDateDaysToAdd;
-            if (request.DueDateMonthOffset.HasValue)
-                report.DueDateMonthOffset = request.DueDateMonthOffset;
-            if (request.DueDateYearOffset.HasValue)
-                report.DueDateYearOffset = request.DueDateYearOffset;
-            if (request.DueDateFixedMonth.HasValue)
-                report.DueDateFixedMonth = request.DueDateFixedMonth;
-            if (request.DueDateFixedDay.HasValue)
-                report.DueDateFixedDay = request.DueDateFixedDay;
-            if (request.DueDateSpecificDate.HasValue)
-                report.DueDateSpecificDate = request.DueDateSpecificDate;
-            if (request.DueDateFixedDatesDefinition != null)
-                report.DueDateFixedDatesDefinition = request.DueDateFixedDatesDefinition;
-            if (request.DueDateRangesDefinition != null)
-                report.DueDateRangesDefinition = request.DueDateRangesDefinition;
+            if (request.DueDateDay.HasValue)
+                report.DueDateDay = request.DueDateDay;
+            if (request.DueDateMonth.HasValue)
+                report.DueDateMonth = request.DueDateMonth;
+            if (request.DueDateDatesDefinition != null)
+                report.DueDateDatesDefinition = request.DueDateDatesDefinition;
             if (request.OriginalDueDateText != null)
                 report.OriginalDueDateText = request.OriginalDueDateText;
             if (request.AlertEarlyDays.HasValue)
@@ -392,9 +374,7 @@ public class ReportService(
         if (
             report.GenerationMode != ReportGenerationMode.Automatic
             || report.Frequency == ReportFrequency.Eventual
-            || report.DueDateRuleType
-                is ReportDueDateRuleType.DaysAfterEvent
-                    or ReportDueDateRuleType.ManualDateRequired
+            || report.DueDateRuleType == ReportDueDateRuleType.ManualDateRequired
         )
             return;
 
@@ -450,15 +430,9 @@ public class ReportService(
             Frequency = r.Frequency,
             GenerationMode = r.GenerationMode,
             DueDateRuleType = r.DueDateRuleType,
-            DueDateDayNumber = r.DueDateDayNumber,
-            DueDateDaysToAdd = r.DueDateDaysToAdd,
-            DueDateMonthOffset = r.DueDateMonthOffset,
-            DueDateYearOffset = r.DueDateYearOffset,
-            DueDateFixedMonth = r.DueDateFixedMonth,
-            DueDateFixedDay = r.DueDateFixedDay,
-            DueDateSpecificDate = r.DueDateSpecificDate,
-            DueDateFixedDatesDefinition = r.DueDateFixedDatesDefinition,
-            DueDateRangesDefinition = r.DueDateRangesDefinition,
+            DueDateDay = r.DueDateDay,
+            DueDateMonth = r.DueDateMonth,
+            DueDateDatesDefinition = r.DueDateDatesDefinition,
             OriginalDueDateText = r.OriginalDueDateText,
             AlertEarlyDays = r.AlertEarlyDays,
             AlertFollowUpDays = r.AlertFollowUpDays,
@@ -529,13 +503,15 @@ public class ReportService(
                     EventDate = i.EventDate,
                     SentDate = i.SentDate,
                     ResponsibleUserId = i.ResponsibleUserId,
-                    ResponsibleUserName = i.ResponsibleUser != null
-                        ? $"{i.ResponsibleUser.FirstName} {i.ResponsibleUser.LastName}"
-                        : null,
+                    ResponsibleUserName =
+                        i.ResponsibleUser != null
+                            ? $"{i.ResponsibleUser.FirstName} {i.ResponsibleUser.LastName}"
+                            : null,
                     SupervisorUserId = i.SupervisorUserId,
-                    SupervisorUserName = i.SupervisorUser != null
-                        ? $"{i.SupervisorUser.FirstName} {i.SupervisorUser.LastName}"
-                        : null,
+                    SupervisorUserName =
+                        i.SupervisorUser != null
+                            ? $"{i.SupervisorUser.FirstName} {i.SupervisorUser.LastName}"
+                            : null,
                     CreatedAt = i.CreatedAt,
                 })
                 .ToList(),

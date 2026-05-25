@@ -18,15 +18,11 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
         builder.Property(r => r.InstructionsUrl).HasColumnType("text");
         builder.Property(r => r.TemplateFileUrl).HasColumnType("text");
         builder.Property(r => r.NotificationEmails).HasColumnType("jsonb");
-        builder.Property(r => r.DueDateFixedDatesDefinition).HasColumnType("jsonb");
-        builder.Property(r => r.DueDateRangesDefinition).HasColumnType("jsonb");
-        builder.Property(r => r.DueDateExceptionsDefinition).HasColumnType("jsonb");
+        builder.Property(r => r.DueDateDatesDefinition).HasColumnType("jsonb");
         builder.Property(r => r.OriginalDueDateText).HasColumnType("text");
         builder.Property(r => r.IsActive).HasDefaultValue(true);
-
         builder.Property(r => r.StartDate).HasColumnType("date").IsRequired();
         builder.Property(r => r.EndDate).HasColumnType("date").IsRequired(false);
-        builder.Property(r => r.DueDateSpecificDate).HasColumnType("date").IsRequired(false);
 
         builder
             .Property(r => r.Frequency)
@@ -44,17 +40,11 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .IsRequired()
             .HasConversion<string>()
             .HasColumnType("varchar(50)");
-        builder
-            .Property(r => r.DueDatePeriodUnit)
-            .HasConversion<string>()
-            .HasColumnType("varchar(20)")
-            .IsRequired(false);
 
         builder.Property(r => r.FormatTypes).IsRequired().HasColumnType("jsonb");
         builder.Property(r => r.AlertEarlyDays).HasDefaultValue(15);
         builder.Property(r => r.AlertFollowUpDays).HasDefaultValue(5);
         builder.Property(r => r.AlertCriticalDays).HasDefaultValue(1);
-
         builder
             .Property(r => r.CreatedAt)
             .HasColumnType("timestamptz")
@@ -76,7 +66,6 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .WithMany(b => b.Reports)
             .HasForeignKey(r => r.BranchId)
             .OnDelete(DeleteBehavior.SetNull);
-
         builder
             .HasOne(r => r.SenderResponsibleUser)
             .WithMany()
