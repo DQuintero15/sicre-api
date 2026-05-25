@@ -32,7 +32,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - sicre_api_keys:/root/.aspnet/DataProtection-Keys
 
 volumes:
   sicre_postgres_data:
+    driver: local
+  sicre_api_keys:
     driver: local

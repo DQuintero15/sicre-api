@@ -490,9 +490,6 @@ namespace Sicre.Api.Migrations
                     b.Property<int?>("DueDateDay")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("DueDateDaysToAdd")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("DueDateMonth")
                         .HasColumnType("integer");
 
@@ -519,9 +516,7 @@ namespace Sicre.Api.Migrations
 
                     b.Property<string>("GenerationMode")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("varchar(50)")
-                        .HasDefaultValue("Automatic");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("InstructionsUrl")
                         .HasColumnType("text");

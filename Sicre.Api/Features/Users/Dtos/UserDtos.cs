@@ -56,3 +56,24 @@ public class UserFilterDto : PagedRequestDto
     public bool? IsActive { get; set; }
     public Role? Role { get; set; }
 }
+
+public class ImportUsersFromCsvResponseDto
+{
+    public int TotalRows { get; set; }
+    public int ProcessedRows { get; set; }
+    public int CreatedUsers { get; set; }
+    public int UpdatedUsers { get; set; }
+    public int FailedRows { get; set; }
+    public List<ImportUsersFromCsvRowResultDto> Rows { get; set; } = [];
+}
+
+public class ImportUsersFromCsvRowResultDto
+{
+    public int RowNumber { get; set; }
+    public string? Email { get; set; }
+    public bool Success { get; set; }
+    public bool Created { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string? RoleAdded { get; set; }
+}
+

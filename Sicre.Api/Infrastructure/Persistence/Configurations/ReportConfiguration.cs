@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sicre.Api.Domain.Entities;
-using Sicre.Api.Domain.Enums;
 
 namespace Sicre.Api.Infrastructure.Persistence.Configurations;
 
@@ -33,8 +32,7 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .Property(r => r.GenerationMode)
             .IsRequired()
             .HasConversion<string>()
-            .HasColumnType("varchar(50)")
-            .HasDefaultValue(ReportGenerationMode.Automatic);
+            .HasColumnType("varchar(50)");
         builder
             .Property(r => r.DueDateRuleType)
             .IsRequired()

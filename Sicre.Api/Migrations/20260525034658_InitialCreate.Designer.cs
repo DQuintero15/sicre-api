@@ -12,7 +12,7 @@ using Sicre.Api.Infrastructure.Persistence;
 namespace Sicre.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260523052119_InitialCreate")]
+    [Migration("20260525034658_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -487,42 +487,18 @@ namespace Sicre.Api.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("DueDateDayNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("DueDateDaysToAdd")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DueDateExceptionsDefinition")
+                    b.Property<string>("DueDateDatesDefinition")
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("DueDateFixedDatesDefinition")
-                        .HasColumnType("jsonb");
-
-                    b.Property<int?>("DueDateFixedDay")
+                    b.Property<int?>("DueDateDay")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("DueDateFixedMonth")
+                    b.Property<int?>("DueDateMonth")
                         .HasColumnType("integer");
-
-                    b.Property<int?>("DueDateMonthOffset")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DueDatePeriodUnit")
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("DueDateRangesDefinition")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("DueDateRuleType")
                         .IsRequired()
                         .HasColumnType("varchar(50)");
-
-                    b.Property<DateOnly?>("DueDateSpecificDate")
-                        .HasColumnType("date");
-
-                    b.Property<int?>("DueDateYearOffset")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
@@ -543,9 +519,7 @@ namespace Sicre.Api.Migrations
 
                     b.Property<string>("GenerationMode")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("varchar(50)")
-                        .HasDefaultValue("Automatic");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("InstructionsUrl")
                         .HasColumnType("text");

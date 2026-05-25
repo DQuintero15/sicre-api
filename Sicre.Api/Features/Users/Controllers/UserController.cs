@@ -12,8 +12,11 @@ namespace Sicre.Api.Features.Users.Controllers;
 [Route("api/user")]
 [Authorize]
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
-public class UserController(IUserService userService, IUserProfileService profileService)
-    : BaseController
+public class UserController(
+    IUserService userService,
+    IUserProfileService profileService,
+    IUserCsvImportService userCsvImportService
+) : BaseController
 {
     [HttpGet("profile")]
     public async Task<ActionResult<ApiResponse<ProfileDto>>> GetProfile()
@@ -61,6 +64,17 @@ public class UserController(IUserService userService, IUserProfileService profil
     )
     {
         var result = await userService.UpdateAsync(id, dto);
+        return FromResult(result);
+    }
+
+    [HttpPost("import-csv")]
+    [Authorize(Roles = nameof(Sicre.Api.Domain.Enums.Role.Administrator))]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ApiResponse<ImportUsersFromCsvResponseDto>>> ImportCsv(
+        IFormFile file
+    )
+    {
+        var result = await userCsvImportService.ImportUsersAsync(file);
         return FromResult(result);
     }
 }

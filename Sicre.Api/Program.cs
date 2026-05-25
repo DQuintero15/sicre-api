@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using FluentValidation;
@@ -5,6 +6,7 @@ using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +35,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AppSettings>(builder.Configuration);
 var appSettings = builder.Configuration.Get<AppSettings>()!;
+
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -104,7 +108,11 @@ builder.Services.AddCors(options =>
 });
 
 // Data Protection (para 2FA secrets)
-builder.Services.AddDataProtection();
+var dataProtectionKeysPath =
+    builder.Configuration["DataProtection:KeysPath"] ?? "/root/.aspnet/DataProtection-Keys";
+builder
+    .Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 
 // Shared utilities
 builder.Services.AddSingleton<IDateHelper, DateHelper>();
@@ -127,6 +135,8 @@ builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 // Users feature services
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserCsvParserService, UserCsvParserService>();
+builder.Services.AddScoped<IUserCsvImportService, UserCsvImportService>();
 
 // Roles feature services
 builder.Services.AddScoped<IRoleService, RoleService>();

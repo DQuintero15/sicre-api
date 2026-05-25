@@ -52,4 +52,5 @@ public class GoogleDriveSettings
 public class SeedSettings
 {
     public string Email { get; set; } = string.Empty;
+    public string DefaultUserPassword { get; set; } = string.Empty;
 }
