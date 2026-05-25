@@ -42,7 +42,7 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
         builder.Property(r => r.FormatTypes).IsRequired().HasColumnType("jsonb");
         builder.Property(r => r.AlertEarlyDays).HasDefaultValue(15);
         builder.Property(r => r.AlertFollowUpDays).HasDefaultValue(5);
-        builder.Property(r => r.AlertCriticalDays).HasDefaultValue(1);
+        builder.Property(r => r.AlertCriticalDays).HasDefaultValue(0);
         builder
             .Property(r => r.CreatedAt)
             .HasColumnType("timestamptz")

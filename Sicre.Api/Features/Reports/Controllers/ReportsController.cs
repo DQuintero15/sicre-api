@@ -68,4 +68,31 @@ public class ReportsController(IReportService reportService) : BaseController
         var result = await reportService.DeactivateAsync(id, userId, ct);
         return FromResult(result);
     }
+
+    /// <summary>Importa reportes desde un archivo .json (multipart/form-data, campo "file").</summary>
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult> ImportFromFile(
+        [FromServices] IReportImportService importService,
+        IFormFile file,
+        CancellationToken ct
+    )
+    {
+        ReportImportRequest? request;
+        using (var stream = file.OpenReadStream())
+        {
+            request = await System.Text.Json.JsonSerializer.DeserializeAsync<ReportImportRequest>(
+                stream,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                ct
+            );
+        }
+
+        if (request is null)
+            return BadRequest(new { result = "error", detail = "Could not parse JSON file." });
+
+        var userId = GetUserId();
+        var success = await importService.ImportAsync(request, userId, ct);
+        return success ? Ok(new { result = "success" }) : StatusCode(500, new { result = "error" });
+    }
 }

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json.Serialization;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
@@ -152,6 +153,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IReportInstanceGenerator, ReportInstanceGenerator>();
 builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
 builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
+builder.Services.AddScoped<IReportImportService, ReportImportService>();
 
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
@@ -164,7 +166,12 @@ builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Controllers
-builder.Services.AddControllers();
+builder
+    .Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // OpenAPI
 builder.Services.AddOpenApi();

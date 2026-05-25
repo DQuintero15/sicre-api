@@ -52,10 +52,7 @@ public class UserCsvImportService(
             var positionMap = await LoadPositionMapAsync();
             var branchMap = await LoadBranchMapAsync();
 
-            var response = new ImportUsersFromCsvResponseDto
-            {
-                TotalRows = parsedCsv.Rows.Count,
-            };
+            var response = new ImportUsersFromCsvResponseDto { TotalRows = parsedCsv.Rows.Count };
 
             foreach (var row in parsedCsv.Rows)
             {
@@ -135,7 +132,9 @@ public class UserCsvImportService(
             var branchId = ResolveBranchId(row.BranchName, branchMap);
 
             // Single role: use parsed role or fall back to default
-            var roleName = string.IsNullOrWhiteSpace(row.DesiredRole) ? DefaultRole : row.DesiredRole;
+            var roleName = string.IsNullOrWhiteSpace(row.DesiredRole)
+                ? DefaultRole
+                : row.DesiredRole;
 
             var existingUser = await userManager.FindByEmailAsync(normalizedEmail);
 
