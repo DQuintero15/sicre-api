@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
@@ -14,8 +15,10 @@ namespace Sicre.Api.Features.ReportInstances.Controllers;
 [Route("api/report-instances")]
 [Authorize]
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
-public class ReportInstancesController(IReportInstanceService reportInstanceService)
-    : BaseController
+public class ReportInstancesController(
+    IReportInstanceService reportInstanceService,
+    IReportAttachmentService attachmentService
+) : BaseController
 {
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>>> GetAll(
@@ -81,6 +84,113 @@ public class ReportInstancesController(IReportInstanceService reportInstanceServ
     {
         var userId = GetUserId();
         var result = await reportInstanceService.RevertAsync(id, request, userId, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/deliver")]
+    public async Task<ActionResult<ApiResponse<ReportInstanceResponse>>> Deliver(
+        Guid id,
+        [FromBody] DeliverRequest request,
+        CancellationToken ct
+    )
+    {
+        var userId = GetUserId();
+        var result = await reportInstanceService.DeliverAsync(id, request, userId, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/extend-deadline")]
+    public async Task<ActionResult<ApiResponse<ReportInstanceResponse>>> ExtendDeadline(
+        Guid id,
+        [FromBody] ExtendDeadlineRequest request,
+        CancellationToken ct
+    )
+    {
+        var userId = GetUserId();
+        var result = await reportInstanceService.ExtendDeadlineAsync(id, request, userId, ct);
+        return FromResult(result);
+    }
+
+    // ── Attachments ──────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/attachments")]
+    public async Task<ActionResult<ApiResponse<PagedResult<ReportAttachmentResponse>>>> GetAttachments(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        var result = await attachmentService.GetByInstanceAsync(id, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/attachments")]
+    [RequestSizeLimit(31_457_280)] // 30 MB
+    public async Task<ActionResult<ApiResponse<ReportAttachmentResponse>>> AddFileAttachment(
+        Guid id,
+        [FromForm] AddFileAttachmentRequest request,
+        IFormFile file,
+        CancellationToken ct
+    )
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
+                System.Net.HttpStatusCode.BadRequest, "No se proporcionó ningún archivo."));
+
+        if (file.Length > 30 * 1024 * 1024)
+            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
+                System.Net.HttpStatusCode.BadRequest, "El archivo supera el tamaño máximo de 30 MB."));
+
+        var userId = GetUserId();
+        await using var stream = file.OpenReadStream();
+        var result = await attachmentService.AddFileAsync(
+            id, request.Type, stream, file.FileName, file.ContentType, userId);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/attachments/url")]
+    public async Task<ActionResult<ApiResponse<ReportAttachmentResponse>>> AddUrlAttachment(
+        Guid id,
+        [FromBody] AddUrlAttachmentRequest request,
+        CancellationToken ct
+    )
+    {
+        var userId = GetUserId();
+        var result = await attachmentService.AddUrlAsync(id, request, userId);
+        return FromResult(result);
+    }
+
+    [HttpGet("{id:guid}/attachments/{uploadId:guid}/progress")]
+    public async Task<ActionResult<ApiResponse<UploadProgress?>>> GetAttachmentProgress(
+        Guid id,
+        Guid uploadId
+    )
+    {
+        var progress = await attachmentService.GetProgressAsync(uploadId);
+        return Ok(ApiResponse<UploadProgress?>.Ok(progress));
+    }
+
+    [HttpPost("{id:guid}/attachments/reversion")]
+    [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
+    [RequestSizeLimit(31_457_280)]
+    public async Task<ActionResult<ApiResponse<ReportAttachmentResponse>>> AddReversionAttachment(
+        Guid id,
+        IFormFile file,
+        [FromForm] string? notes,
+        CancellationToken ct
+    )
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
+                System.Net.HttpStatusCode.BadRequest, "No se proporcionó ningún archivo."));
+
+        if (file.Length > 30 * 1024 * 1024)
+            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
+                System.Net.HttpStatusCode.BadRequest, "El archivo supera el tamaño máximo de 30 MB."));
+
+        var userId = GetUserId();
+        await using var stream = file.OpenReadStream();
+        var result = await attachmentService.AddReversionFileAsync(
+            id, stream, file.FileName, file.ContentType, userId, notes);
         return FromResult(result);
     }
 }

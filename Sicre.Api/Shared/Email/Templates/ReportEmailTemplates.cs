@@ -73,6 +73,9 @@ internal static class ReportEmailTemplates
         string alertType,
         string alertMessage,
         string frontendUrl,
+        string backendUrl,
+        Guid instanceId,
+        Guid notificationId,
         string? branchName = null
     )
     {
@@ -88,6 +91,9 @@ internal static class ReportEmailTemplates
         var branchRow = string.IsNullOrWhiteSpace(branchName)
             ? ""
             : $"<p style='margin:4px 0;font-size:14px;'><strong>Sede:</strong> {branchName}</p>";
+
+        var instanceUrl = $"{frontendUrl}/report-instances/{instanceId}";
+        var pixelUrl = $"{backendUrl}/api/notifications/{notificationId}/mark-as-read";
 
         return $"""
             <html lang='es'>
@@ -112,13 +118,14 @@ internal static class ReportEmailTemplates
                                     {branchRow}
                                 </div>
                                 <div style='text-align:center;'>
-                                    <a href='{frontendUrl}' style='background:#1d3e81;color:#fff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;'>Ir a la plataforma</a>
+                                    <a href='{instanceUrl}' style='background:#1d3e81;color:#fff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;'>Ver reporte en SICRE</a>
                                 </div>
                             </td></tr>
                             <tr><td style='background-color:#f5f5f5;padding:18px;text-align:center;font-size:12px;color:#888;border-radius:0 0 10px 10px;'>© 2025 Grupo del Llano. Todos los derechos reservados.</td></tr>
                         </table>
                     </td></tr>
                 </table>
+                <img src='{pixelUrl}' width='1' height='1' alt='' style='display:none;' />
             </body>
             </html>
             """;

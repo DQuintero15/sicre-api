@@ -10,24 +10,12 @@ public class CreateManualReportInstanceRequestValidator
     {
         RuleFor(x => x.ReportId).NotEmpty().WithMessage("El reporte es requerido.");
 
-        RuleFor(x => x.PeriodYear)
-            .GreaterThan(0)
-            .WithMessage("El año del período debe ser mayor a 0.");
+        RuleFor(x => x.DueDate)
+            .NotEmpty()
+            .WithMessage("La fecha de vencimiento es requerida.");
 
         RuleFor(x => x.ManualActivationReason)
             .NotEmpty()
-            .WithMessage("La razón de activación manual es requerida.");
-
-        When(
-            x => x.DueDateOverride.HasValue,
-            () =>
-            {
-                RuleFor(x => x.DueDateOverrideReason)
-                    .NotEmpty()
-                    .WithMessage(
-                        "La razón de la fecha límite personalizada es requerida cuando se especifica una fecha límite."
-                    );
-            }
-        );
+            .WithMessage("El motivo de activación manual es requerido.");
     }
 }

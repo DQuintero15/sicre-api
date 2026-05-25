@@ -78,6 +78,9 @@ public class ReportService(
             if (request.GenerationMode.HasValue)
                 query = query.Where(r => r.GenerationMode == request.GenerationMode.Value);
 
+            if (request.DueDateRuleType.HasValue)
+                query = query.Where(r => r.DueDateRuleType == request.DueDateRuleType.Value);
+
             if (request.IsActive.HasValue)
                 query = query.Where(r => r.IsActive == request.IsActive.Value);
 

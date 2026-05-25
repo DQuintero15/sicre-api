@@ -51,6 +51,8 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
         DateOnly dueDate,
         string alertType,
         string alertMessage,
+        Guid instanceId,
+        Guid notificationId,
         string? branchName = null
     ) =>
         ReportEmailTemplates.ReportAlertNotification(
@@ -61,6 +63,9 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
             alertType,
             alertMessage,
             _settings.FrontendUrl,
+            _settings.BackendUrl,
+            instanceId,
+            notificationId,
             branchName
         );
 

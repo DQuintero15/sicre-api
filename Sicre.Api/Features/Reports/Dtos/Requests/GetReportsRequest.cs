@@ -11,5 +11,6 @@ public class GetReportsRequest : PagedRequestDto
     public Guid? ProcessId { get; set; }
     public ReportFrequency? Frequency { get; set; }
     public ReportGenerationMode? GenerationMode { get; set; }
+    public ReportDueDateRuleType? DueDateRuleType { get; set; }
     public bool? IsActive { get; set; }
 }

@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Dtos;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
@@ -19,7 +21,8 @@ public class NotificationJobService(
     IEmailTemplateService emailTemplateService,
     IDateHelper dateHelper,
     ILogger<NotificationJobService> logger,
-    UserManager<User> userManager
+    UserManager<User> userManager,
+    INotificationRealtimeService realtimeService
 ) : INotificationJobService
 {
     public async Task RunDailyNotificationsAsync()
@@ -165,7 +168,7 @@ public class NotificationJobService(
                 if (string.IsNullOrWhiteSpace(user.Email))
                     continue;
 
-                await PersistNotificationAsync(
+                var notification = await PersistNotificationAsync(
                     instance,
                     user.Id,
                     title,
@@ -181,6 +184,8 @@ public class NotificationJobService(
                     instance.DueDate,
                     alertType,
                     content,
+                    instance.Id,
+                    notification?.Id ?? Guid.Empty,
                     branchName
                 );
 
@@ -209,6 +214,8 @@ public class NotificationJobService(
                     instance.DueDate,
                     alertType,
                     content,
+                    instance.Id,
+                    Guid.Empty,   // correo adicional sin notificación APP — pixel no aplica
                     branchName
                 );
 
@@ -340,7 +347,7 @@ public class NotificationJobService(
             emails.Add(email.Trim().ToLowerInvariant());
     }
 
-    private async Task PersistNotificationAsync(
+    private async Task<Notification?> PersistNotificationAsync(
         ReportInstance instance,
         Guid userId,
         string title,
@@ -361,11 +368,31 @@ public class NotificationJobService(
                 Severity = severity,
                 Priority = priority,
                 ReportInstanceId = instance.Id,
+                Url = $"/report-instances/{instance.Id}",
                 CreatedAt = DateTime.UtcNow,
             };
 
             db.Notifications.Add(notification);
             await db.SaveChangesAsync();
+
+            await realtimeService.PublishCreatedAsync(
+                new NotificationDto
+                {
+                    Id = notification.Id,
+                    Title = notification.Title,
+                    Content = notification.Content,
+                    Type = notification.Type,
+                    Severity = notification.Severity,
+                    Priority = notification.Priority,
+                    Readed = false,
+                    CreatedAt = notification.CreatedAt,
+                    ReportInstanceId = notification.ReportInstanceId,
+                    Url = notification.Url,
+                },
+                userId
+            );
+
+            return notification;
         }
         catch (Exception ex)
         {
@@ -375,6 +402,7 @@ public class NotificationJobService(
                 userId,
                 instance.Id
             );
+            return null;
         }
     }
 }

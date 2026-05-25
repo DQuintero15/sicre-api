@@ -15,13 +15,17 @@ using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Features.Auth.Services;
+using Sicre.Api.Hubs;
 using Sicre.Api.Features.Branches.Services;
 using Sicre.Api.Features.ControlEntities.Services;
+using Sicre.Api.Features.GoogleDrive.Services;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.Positions.Services;
 using Sicre.Api.Features.Processes.Services;
 using Sicre.Api.Features.ReportInstances.Services;
 using Sicre.Api.Features.Reports.Services;
 using Sicre.Api.Features.Roles.Services;
+using Sicre.Api.Features.SICRESettings.Services;
 using Sicre.Api.Features.TwoFactor.Services;
 using Sicre.Api.Features.Users.Services;
 using Sicre.Api.Infrastructure.Hangfire;
@@ -29,6 +33,7 @@ using Sicre.Api.Infrastructure.Jobs;
 using Sicre.Api.Infrastructure.Middleware;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Infrastructure.Persistence.Seeders;
+using Sicre.Api.Infrastructure.Workers;
 using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
 
@@ -93,7 +98,22 @@ builder
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero,
         };
+
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+                    context.Token = accessToken;
+                return Task.CompletedTask;
+            },
+        };
     });
+
+// SignalR
+builder.Services.AddSignalR();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -154,6 +174,19 @@ builder.Services.AddScoped<IReportInstanceGenerator, ReportInstanceGenerator>();
 builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
 builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
 builder.Services.AddScoped<IReportImportService, ReportImportService>();
+builder.Services.AddScoped<IReportAttachmentService, ReportAttachmentService>();
+
+// Google Drive
+builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();
+builder.Services.AddSingleton<IBackgroundQueueService, BackgroundQueueService>();
+builder.Services.AddHostedService<DriveUploadWorker>();
+
+// Notification feature services
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
+
+// SICRE Settings
+builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
 
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
@@ -207,6 +240,7 @@ app.UseAuthentication();
 app.UseAuthMiddleware();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 // Hangfire dashboard (solo Administrador)
 app.UseHangfireDashboard(

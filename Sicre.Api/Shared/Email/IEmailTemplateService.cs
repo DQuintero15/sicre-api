@@ -26,6 +26,8 @@ public interface IEmailTemplateService
         DateOnly dueDate,
         string alertType,
         string alertMessage,
+        Guid instanceId,
+        Guid notificationId,
         string? branchName = null
     );
     string GetReportsAssignedEmailTemplate(ReportsAssignedEmailDto data, Guid notificationId);

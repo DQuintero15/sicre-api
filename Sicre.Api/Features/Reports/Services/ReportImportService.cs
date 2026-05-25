@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using SICRESettingsEntity = Sicre.Api.Domain.Entities.SICRESettings;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
@@ -104,7 +105,7 @@ public class ReportImportService(
     private async Task ProcessItemAsync(
         ImportReportItem item,
         bool generateInstances,
-        SICRESettings? settings,
+        SICRESettingsEntity? settings,
         Guid importedByUserId,
         Dictionary<string, Guid> userMap,
         Dictionary<string, Guid> branchMap,

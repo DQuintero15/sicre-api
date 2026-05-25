@@ -43,6 +43,20 @@ public interface IReportInstanceService
         Guid revertedByUserId,
         CancellationToken ct = default
     );
+
+    Task<ApiResponse<ReportInstanceResponse>> DeliverAsync(
+        Guid id,
+        DeliverRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    );
+
+    Task<ApiResponse<ReportInstanceResponse>> ExtendDeadlineAsync(
+        Guid id,
+        ExtendDeadlineRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    );
 }
 
 public class ReportInstanceService(
@@ -160,83 +174,31 @@ public class ReportInstanceService(
                 );
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var periodYear = request.DueDate.Year;
+            var periodMonth = DerivePeriodMonth(report.Frequency, request.DueDate.Month);
 
-            DateOnly dueDate;
-            DateOnly periodStart;
-            DateOnly periodEnd;
-            string periodName;
+            var (periodStart, periodEnd, periodName) = ResolvePeriodInfo(
+                report,
+                periodYear,
+                periodMonth,
+                today
+            );
 
-            if (request.DueDateOverride.HasValue)
-            {
-                dueDate = request.DueDateOverride.Value;
-
-                var (ps, pe, pn) = ResolvePeriodInfo(
-                    report,
-                    request.PeriodYear,
-                    request.PeriodMonth,
-                    today
-                );
-                periodStart = ps;
-                periodEnd = pe;
-                periodName = pn;
-            }
-            else
-            {
-                var windowStart = new DateOnly(request.PeriodYear, 1, 1);
-                var windowEnd = new DateOnly(request.PeriodYear, 12, 31);
-                // Manual creation: GoLiveDate filter does not apply, pass MinValue to bypass it.
-                var candidates = generator.GetCandidatesInWindow(
-                    report,
-                    windowStart,
-                    windowEnd,
-                    DateOnly.MinValue
-                );
-
-                ReportInstanceCandidate? match = request.PeriodMonth.HasValue
-                    ? candidates.FirstOrDefault(c =>
-                        c.PeriodYear == request.PeriodYear
-                        && c.PeriodMonth == request.PeriodMonth.Value
-                    )
-                    : candidates.FirstOrDefault(c => c.PeriodYear == request.PeriodYear);
-
-                if (match is not null)
-                {
-                    dueDate = match.DueDate;
-                    periodStart = match.PeriodStart;
-                    periodEnd = match.PeriodEnd;
-                    periodName = match.PeriodName;
-                }
-                else
-                {
-                    var (ps, pe, pn) = ResolvePeriodInfo(
-                        report,
-                        request.PeriodYear,
-                        request.PeriodMonth,
-                        today
-                    );
-                    periodStart = ps;
-                    periodEnd = pe;
-                    periodName = pn;
-                    dueDate = today;
-                }
-            }
-
-            var status = dueDate < today ? ReportStatus.Overdue : ReportStatus.Pending;
+            var status = request.DueDate < today ? ReportStatus.Overdue : ReportStatus.Pending;
 
             var instance = new ReportInstance
             {
                 Id = Guid.NewGuid(),
                 ReportId = request.ReportId,
-                PeriodYear = request.PeriodYear,
-                PeriodMonth = request.PeriodMonth,
+                PeriodYear = periodYear,
+                PeriodMonth = periodMonth,
                 PeriodName = periodName,
                 PeriodStart = periodStart,
                 PeriodEnd = periodEnd,
-                DueDate = dueDate,
+                DueDate = request.DueDate,
                 EventDate = request.EventDate,
                 Status = status,
                 ManualActivationReason = request.ManualActivationReason,
-                DueDateOverrideReason = request.DueDateOverrideReason,
                 ResponsibleUserId = report.SenderResponsibleUserId,
                 SupervisorUserId = report.FollowUpLeaderUserId,
                 CreatedByUserId = createdByUserId,
@@ -467,7 +429,133 @@ public class ReportInstanceService(
         }
     }
 
+    public async Task<ApiResponse<ReportInstanceResponse>> DeliverAsync(
+        Guid id,
+        DeliverRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    )
+    {
+        try
+        {
+            var instance = await db
+                .ReportInstances.Include(ri => ri.Report)
+                .Include(ri => ri.ResponsibleUser)
+                .Include(ri => ri.SupervisorUser)
+                .FirstOrDefaultAsync(ri => ri.Id == id, ct);
+
+            if (instance is null)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.NotFound,
+                    "Instancia de reporte no encontrada."
+                );
+
+            if (instance.Status is ReportStatus.SentOnTime or ReportStatus.SentLate)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "La instancia ya fue marcada como enviada."
+                );
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var sentDate = request.SentDate ?? today;
+            var isLate = sentDate > instance.DueDate;
+
+            instance.SentDate = sentDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            instance.Status = isLate ? ReportStatus.SentLate : ReportStatus.SentOnTime;
+
+            if (isLate && !string.IsNullOrWhiteSpace(request.DelayReason))
+                instance.DelayReason = request.DelayReason.Trim();
+
+            instance.UpdatedAt = DateTime.UtcNow;
+            instance.UpdatedByUserId = userId;
+
+            await db.SaveChangesAsync(ct);
+
+            return ApiResponse<ReportInstanceResponse>.Ok(
+                ToResponse(instance),
+                isLate
+                    ? "Instancia marcada como enviada tarde."
+                    : "Instancia marcada como enviada a tiempo."
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error al entregar instancia {Id}", id);
+            return ApiResponse<ReportInstanceResponse>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error al registrar el envío."
+            );
+        }
+    }
+
+    public async Task<ApiResponse<ReportInstanceResponse>> ExtendDeadlineAsync(
+        Guid id,
+        ExtendDeadlineRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    )
+    {
+        try
+        {
+            var instance = await db
+                .ReportInstances.Include(ri => ri.Report)
+                .Include(ri => ri.ResponsibleUser)
+                .Include(ri => ri.SupervisorUser)
+                .FirstOrDefaultAsync(ri => ri.Id == id, ct);
+
+            if (instance is null)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.NotFound,
+                    "Instancia de reporte no encontrada."
+                );
+
+            if (instance.Status is ReportStatus.SentOnTime or ReportStatus.SentLate)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "No se puede ampliar el plazo de una instancia ya enviada."
+                );
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (request.NewDueDate <= today)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "La nueva fecha de vencimiento debe ser posterior a hoy."
+                );
+
+            instance.DueDate = request.NewDueDate;
+            instance.DueDateOverrideReason = request.Reason.Trim();
+            instance.Status = ReportStatus.Pending;
+            instance.UpdatedAt = DateTime.UtcNow;
+            instance.UpdatedByUserId = userId;
+
+            await db.SaveChangesAsync(ct);
+
+            return ApiResponse<ReportInstanceResponse>.Ok(
+                ToResponse(instance),
+                "Plazo de entrega ampliado exitosamente."
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error al ampliar plazo de instancia {Id}", id);
+            return ApiResponse<ReportInstanceResponse>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error al ampliar el plazo de entrega."
+            );
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────
+
+    private static int? DerivePeriodMonth(ReportFrequency frequency, int month) =>
+        frequency switch
+        {
+            ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated => month,
+            ReportFrequency.Quarterly => ((month - 1) / 3) * 3 + 1,      // 1, 4, 7, 10
+            ReportFrequency.SemiAnnual => month <= 6 ? 1 : 7,
+            ReportFrequency.Annual or ReportFrequency.Eventual => null,
+            _ => month,
+        };
 
     private static (DateOnly periodStart, DateOnly periodEnd, string periodName) ResolvePeriodInfo(
         Report report,

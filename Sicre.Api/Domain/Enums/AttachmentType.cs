@@ -15,4 +15,7 @@ public enum AttachmentType
 
     [Display(Name = "Soporte de reversión")]
     ReversionEvidence = 4,
+
+    [Display(Name = "Otro")]
+    Other = 5,
 }
