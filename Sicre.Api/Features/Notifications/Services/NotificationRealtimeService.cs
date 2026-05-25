@@ -10,17 +10,14 @@ public interface INotificationRealtimeService
     Task PublishReadAsync(Guid notificationId, Guid userId);
 }
 
-public class NotificationRealtimeService(
-    IHubContext<NotificationHub> hubContext
-) : INotificationRealtimeService
+public class NotificationRealtimeService(IHubContext<NotificationHub> hubContext)
+    : INotificationRealtimeService
 {
     public Task PublishCreatedAsync(NotificationDto notification, Guid userId) =>
-        hubContext.Clients
-            .Group($"user:{userId}")
-            .SendAsync("notification_created", notification);
+        hubContext.Clients.Group($"user:{userId}").SendAsync("notification_created", notification);
 
     public Task PublishReadAsync(Guid notificationId, Guid userId) =>
-        hubContext.Clients
-            .Group($"user:{userId}")
+        hubContext
+            .Clients.Group($"user:{userId}")
             .SendAsync("notification_read", new { id = notificationId, readed = true });
 }

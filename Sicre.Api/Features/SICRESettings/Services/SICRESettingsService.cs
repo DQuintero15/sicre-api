@@ -16,17 +16,15 @@ public interface ISICRESettingsService
     );
 }
 
-public class SICRESettingsService(
-    ApplicationDbContext db,
-    ILogger<SICRESettingsService> logger
-) : ISICRESettingsService
+public class SICRESettingsService(ApplicationDbContext db, ILogger<SICRESettingsService> logger)
+    : ISICRESettingsService
 {
     public async Task<ApiResponse<SICRESettingsResponse>> GetAsync(CancellationToken ct = default)
     {
         try
         {
-            var settings = await db.SICRESettings
-                .Include(s => s.UpdatedByUser)
+            var settings = await db
+                .SICRESettings.Include(s => s.UpdatedByUser)
                 .FirstOrDefaultAsync(ct);
 
             if (settings is null)
@@ -55,8 +53,8 @@ public class SICRESettingsService(
     {
         try
         {
-            var settings = await db.SICRESettings
-                .Include(s => s.UpdatedByUser)
+            var settings = await db
+                .SICRESettings.Include(s => s.UpdatedByUser)
                 .FirstOrDefaultAsync(ct);
 
             if (settings is null)

@@ -2,10 +2,10 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
-using SICRESettingsEntity = Sicre.Api.Domain.Entities.SICRESettings;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
+using SICRESettingsEntity = Sicre.Api.Domain.Entities.SICRESettings;
 
 namespace Sicre.Api.Features.Reports.Services;
 
@@ -31,8 +31,21 @@ public class ReportImportService(
         CancellationToken ct = default
     )
     {
+        var importId = Guid.NewGuid();
+
+        using var scope = logger.BeginScope(
+            new Dictionary<string, object>
+            {
+                ["ImportId"] = importId,
+                ["ImportSource"] = request.SourceFile ?? "unknown",
+                ["ImportedBy"] = importedByUserId,
+                ["Feature"] = "ReportImport",
+            }
+        );
+
         logger.LogInformation(
-            "Import started — source={Source}, reports={Count}, generateInstances={Generate}",
+            "[ReportImport] Started — importId={ImportId}, source={Source}, reports={Count}, generateInstances={Generate}",
+            importId,
             request.SourceFile,
             request.Reports.Count,
             request.GenerateInitialInstances
@@ -67,7 +80,7 @@ public class ReportImportService(
 
                     succeeded++;
                     logger.LogInformation(
-                        "Row {Row}: [{Code}] imported",
+                        "[ReportImport] Row {Row}: [{Code}] OK",
                         item.SourceRowNumber,
                         item.Code
                     );
@@ -77,7 +90,7 @@ public class ReportImportService(
                     failed++;
                     logger.LogError(
                         ex,
-                        "Row {Row}: [{Code}] FAILED — {Message}",
+                        "[ReportImport] Row {Row}: [{Code}] FAILED — {ErrorMessage}",
                         item.SourceRowNumber,
                         item.Code,
                         ex.Message
@@ -86,7 +99,8 @@ public class ReportImportService(
             }
 
             logger.LogInformation(
-                "Import finished — succeeded={Succeeded}, failed={Failed}",
+                "[ReportImport] Finished — importId={ImportId}, succeeded={Succeeded}, failed={Failed}",
+                importId,
                 succeeded,
                 failed
             );
@@ -95,7 +109,11 @@ public class ReportImportService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Import aborted with critical error");
+            logger.LogError(
+                ex,
+                "[ReportImport] Aborted — importId={ImportId}, critical error",
+                importId
+            );
             return false;
         }
     }

@@ -10,9 +10,7 @@ public class CreateManualReportInstanceRequestValidator
     {
         RuleFor(x => x.ReportId).NotEmpty().WithMessage("El reporte es requerido.");
 
-        RuleFor(x => x.DueDate)
-            .NotEmpty()
-            .WithMessage("La fecha de vencimiento es requerida.");
+        RuleFor(x => x.DueDate).NotEmpty().WithMessage("La fecha de vencimiento es requerida.");
 
         RuleFor(x => x.ManualActivationReason)
             .NotEmpty()

@@ -16,14 +16,16 @@ namespace Sicre.Api.Migrations
                 table: "report_attachments",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 0
+            );
 
             migrationBuilder.AddColumn<string>(
                 name: "Url",
                 schema: "reports",
                 table: "report_attachments",
                 type: "text",
-                nullable: true);
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
@@ -32,12 +34,14 @@ namespace Sicre.Api.Migrations
             migrationBuilder.DropColumn(
                 name: "UploadProgress",
                 schema: "reports",
-                table: "report_attachments");
+                table: "report_attachments"
+            );
 
             migrationBuilder.DropColumn(
                 name: "Url",
                 schema: "reports",
-                table: "report_attachments");
+                table: "report_attachments"
+            );
         }
     }
 }

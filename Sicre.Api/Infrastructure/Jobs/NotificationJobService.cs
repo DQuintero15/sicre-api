@@ -215,7 +215,7 @@ public class NotificationJobService(
                     alertType,
                     content,
                     instance.Id,
-                    Guid.Empty,   // correo adicional sin notificación APP — pixel no aplica
+                    Guid.Empty, // correo adicional sin notificación APP — pixel no aplica
                     branchName
                 );
 

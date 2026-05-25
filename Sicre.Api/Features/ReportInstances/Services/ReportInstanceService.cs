@@ -551,7 +551,7 @@ public class ReportInstanceService(
         frequency switch
         {
             ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated => month,
-            ReportFrequency.Quarterly => ((month - 1) / 3) * 3 + 1,      // 1, 4, 7, 10
+            ReportFrequency.Quarterly => ((month - 1) / 3) * 3 + 1, // 1, 4, 7, 10
             ReportFrequency.SemiAnnual => month <= 6 ? 1 : 7,
             ReportFrequency.Annual or ReportFrequency.Eventual => null,
             _ => month,

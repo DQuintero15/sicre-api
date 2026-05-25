@@ -114,10 +114,9 @@ public class ReportInstancesController(
     // ── Attachments ──────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/attachments")]
-    public async Task<ActionResult<ApiResponse<PagedResult<ReportAttachmentResponse>>>> GetAttachments(
-        Guid id,
-        CancellationToken ct
-    )
+    public async Task<
+        ActionResult<ApiResponse<PagedResult<ReportAttachmentResponse>>>
+    > GetAttachments(Guid id, CancellationToken ct)
     {
         var result = await attachmentService.GetByInstanceAsync(id, ct);
         return FromResult(result);
@@ -133,17 +132,31 @@ public class ReportInstancesController(
     )
     {
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
-                System.Net.HttpStatusCode.BadRequest, "No se proporcionó ningún archivo."));
+            return BadRequest(
+                ApiResponse<ReportAttachmentResponse>.Fail(
+                    System.Net.HttpStatusCode.BadRequest,
+                    "No se proporcionó ningún archivo."
+                )
+            );
 
         if (file.Length > 30 * 1024 * 1024)
-            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
-                System.Net.HttpStatusCode.BadRequest, "El archivo supera el tamaño máximo de 30 MB."));
+            return BadRequest(
+                ApiResponse<ReportAttachmentResponse>.Fail(
+                    System.Net.HttpStatusCode.BadRequest,
+                    "El archivo supera el tamaño máximo de 30 MB."
+                )
+            );
 
         var userId = GetUserId();
         await using var stream = file.OpenReadStream();
         var result = await attachmentService.AddFileAsync(
-            id, request.Type, stream, file.FileName, file.ContentType, userId);
+            id,
+            request.Type,
+            stream,
+            file.FileName,
+            file.ContentType,
+            userId
+        );
         return FromResult(result);
     }
 
@@ -180,17 +193,31 @@ public class ReportInstancesController(
     )
     {
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
-                System.Net.HttpStatusCode.BadRequest, "No se proporcionó ningún archivo."));
+            return BadRequest(
+                ApiResponse<ReportAttachmentResponse>.Fail(
+                    System.Net.HttpStatusCode.BadRequest,
+                    "No se proporcionó ningún archivo."
+                )
+            );
 
         if (file.Length > 30 * 1024 * 1024)
-            return BadRequest(ApiResponse<ReportAttachmentResponse>.Fail(
-                System.Net.HttpStatusCode.BadRequest, "El archivo supera el tamaño máximo de 30 MB."));
+            return BadRequest(
+                ApiResponse<ReportAttachmentResponse>.Fail(
+                    System.Net.HttpStatusCode.BadRequest,
+                    "El archivo supera el tamaño máximo de 30 MB."
+                )
+            );
 
         var userId = GetUserId();
         await using var stream = file.OpenReadStream();
         var result = await attachmentService.AddReversionFileAsync(
-            id, stream, file.FileName, file.ContentType, userId, notes);
+            id,
+            stream,
+            file.FileName,
+            file.ContentType,
+            userId,
+            notes
+        );
         return FromResult(result);
     }
 }

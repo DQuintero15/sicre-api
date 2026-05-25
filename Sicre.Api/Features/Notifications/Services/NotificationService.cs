@@ -42,7 +42,7 @@ public class NotificationService(
             var query = db
                 .Notifications.Include(n => n.ReportInstance)
                     .ThenInclude(ri => ri!.Report)
-                    .ThenInclude(r => r!.Branch)
+                        .ThenInclude(r => r!.Branch)
                 .Where(n => n.UserId == userId && n.Type == NotificationType.APP);
 
             var total = await query.CountAsync(ct);
@@ -66,9 +66,8 @@ public class NotificationService(
                     CreatedAt = n.CreatedAt,
                     ReportInstanceId = n.ReportInstanceId,
                     Url = n.Url,
-                    BranchName = n.ReportInstance != null
-                        ? n.ReportInstance.Report!.Branch!.Name
-                        : null,
+                    BranchName =
+                        n.ReportInstance != null ? n.ReportInstance.Report!.Branch!.Name : null,
                 })
                 .ToListAsync(ct);
 

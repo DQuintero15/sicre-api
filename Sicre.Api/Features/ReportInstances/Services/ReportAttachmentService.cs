@@ -330,9 +330,10 @@ public class ReportAttachmentService(
                     FileSize = a.FileSize,
                     UploadProgress = a.UploadProgress,
                     UploadedByUserId = a.UploadedByUserId,
-                    UploadedByUserName = a.UploadedByUser != null
-                        ? $"{a.UploadedByUser.FirstName} {a.UploadedByUser.LastName}"
-                        : null,
+                    UploadedByUserName =
+                        a.UploadedByUser != null
+                            ? $"{a.UploadedByUser.FirstName} {a.UploadedByUser.LastName}"
+                            : null,
                     IsActive = a.IsActive,
                     CreatedAt = a.CreatedAt,
                 })
@@ -350,11 +351,7 @@ public class ReportAttachmentService(
         }
         catch (Exception ex)
         {
-            logger.LogError(
-                ex,
-                "Error al obtener adjuntos de instancia {InstanceId}.",
-                instanceId
-            );
+            logger.LogError(ex, "Error al obtener adjuntos de instancia {InstanceId}.", instanceId);
             return ApiResponse<PagedResult<ReportAttachmentResponse>>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error al obtener los adjuntos."
@@ -364,7 +361,8 @@ public class ReportAttachmentService(
 
     public async Task<UploadProgress?> GetProgressAsync(Guid attachmentId)
     {
-        var a = await db.ReportAttachments.AsNoTracking()
+        var a = await db
+            .ReportAttachments.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == attachmentId);
         return a?.UploadProgress;
     }
@@ -384,15 +382,18 @@ public class ReportAttachmentService(
         return $"{code.ToUpperInvariant()}_{periodCode}_{suffix}{ext}";
     }
 
+    // File name:   RIESGO-01_2026-05_RF.pdf
+    // Folder path: CIE / RIESGO-01 / 2026 / 05
     private static string GetPeriodCode(ReportInstance i)
     {
         var freq = i.Report?.Frequency ?? ReportFrequency.Monthly;
         return freq switch
         {
-            ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated
-                => $"{i.PeriodYear}-{i.PeriodMonth:D2}",
-            ReportFrequency.Quarterly => $"{i.PeriodYear}-T{GetQuarterNumber(i.PeriodMonth)}",
-            ReportFrequency.SemiAnnual => $"{i.PeriodYear}-S{GetSemiNumber(i.PeriodMonth)}",
+            ReportFrequency.Monthly
+            or ReportFrequency.MonthlyAnticipated
+            or ReportFrequency.Eventual => $"{i.PeriodYear}-{i.PeriodMonth:D2}",
+            ReportFrequency.Quarterly => $"{i.PeriodYear}-T{Quarter(i.PeriodMonth)}",
+            ReportFrequency.SemiAnnual => $"{i.PeriodYear}-S{Semi(i.PeriodMonth)}",
             ReportFrequency.Annual => i.PeriodYear.ToString(),
             _ => $"{i.PeriodYear}-{i.PeriodMonth:D2}",
         };
@@ -403,50 +404,32 @@ public class ReportAttachmentService(
         var freq = i.Report?.Frequency ?? ReportFrequency.Monthly;
         return freq switch
         {
-            ReportFrequency.Monthly or ReportFrequency.MonthlyAnticipated
-                => $"{i.PeriodMonth:D2}_{SpanishMonth(i.PeriodMonth)}",
-            ReportFrequency.Quarterly => $"T{GetQuarterNumber(i.PeriodMonth)}_Trimestre{GetQuarterNumber(i.PeriodMonth)}",
-            ReportFrequency.SemiAnnual => $"S{GetSemiNumber(i.PeriodMonth)}_Semestre{GetSemiNumber(i.PeriodMonth)}",
-            ReportFrequency.Annual => $"{i.PeriodYear}_Anual",
-            _ => i.PeriodName,
+            ReportFrequency.Monthly
+            or ReportFrequency.MonthlyAnticipated
+            or ReportFrequency.Eventual => $"{i.PeriodMonth:D2}",
+            ReportFrequency.Quarterly => $"T{Quarter(i.PeriodMonth)}",
+            ReportFrequency.SemiAnnual => $"S{Semi(i.PeriodMonth)}",
+            ReportFrequency.Annual => "Anual",
+            _ => $"{i.PeriodMonth:D2}",
         };
     }
 
-    private static string GetEntityFolderName(Report r) =>
-        $"{r.ControlEntity?.Abbreviation ?? ""} - {r.ControlEntity?.Name ?? r.Code}";
+    private static string GetEntityFolderName(Report r) => r.ControlEntity?.Abbreviation ?? r.Code;
 
     private static string GetTypeSuffix(AttachmentType t) =>
         t switch
         {
-            AttachmentType.FinalReport => "ReporteFinal",
-            AttachmentType.SubmissionEvidence => "EvidenciaEnvio",
-            AttachmentType.DeadlineExtensionEvidence => "EvidenciaAmpliacionPlazo",
-            AttachmentType.ReversionEvidence => "EvidenciaReversion",
-            AttachmentType.Other => "Otro",
-            _ => "Anexo",
+            AttachmentType.FinalReport => "RF",
+            AttachmentType.SubmissionEvidence => "EE",
+            AttachmentType.DeadlineExtensionEvidence => "EA",
+            AttachmentType.ReversionEvidence => "ER",
+            AttachmentType.Other => "OT",
+            _ => "OT",
         };
 
-    private static int GetQuarterNumber(int? month) => ((( month ?? 1) - 1) / 3) + 1;
+    private static int Quarter(int? month) => ((month ?? 1) - 1) / 3 + 1;
 
-    private static int GetSemiNumber(int? month) => (month ?? 1) <= 6 ? 1 : 2;
-
-    private static string SpanishMonth(int? m) =>
-        m switch
-        {
-            1 => "Enero",
-            2 => "Febrero",
-            3 => "Marzo",
-            4 => "Abril",
-            5 => "Mayo",
-            6 => "Junio",
-            7 => "Julio",
-            8 => "Agosto",
-            9 => "Septiembre",
-            10 => "Octubre",
-            11 => "Noviembre",
-            12 => "Diciembre",
-            _ => $"Mes{m}",
-        };
+    private static int Semi(int? month) => (month ?? 1) <= 6 ? 1 : 2;
 
     private static async Task<string> EnsureFolderAsync(
         IGoogleDriveService drive,

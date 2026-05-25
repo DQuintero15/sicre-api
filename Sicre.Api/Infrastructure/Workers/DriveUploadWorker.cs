@@ -2,10 +2,8 @@ using Sicre.Api.Shared;
 
 namespace Sicre.Api.Infrastructure.Workers;
 
-public class DriveUploadWorker(
-    IBackgroundQueueService queue,
-    ILogger<DriveUploadWorker> logger
-) : BackgroundService
+public class DriveUploadWorker(IBackgroundQueueService queue, ILogger<DriveUploadWorker> logger)
+    : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

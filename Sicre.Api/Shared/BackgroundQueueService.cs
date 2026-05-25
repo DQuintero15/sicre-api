@@ -10,8 +10,9 @@ public interface IBackgroundQueueService
 
 public class BackgroundQueueService : IBackgroundQueueService
 {
-    private readonly Channel<Func<CancellationToken, Task>> _channel =
-        Channel.CreateUnbounded<Func<CancellationToken, Task>>();
+    private readonly Channel<Func<CancellationToken, Task>> _channel = Channel.CreateUnbounded<
+        Func<CancellationToken, Task>
+    >();
 
     public void Enqueue(Func<CancellationToken, Task> workItem) =>
         _channel.Writer.TryWrite(workItem);

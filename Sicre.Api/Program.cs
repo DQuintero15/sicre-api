@@ -15,7 +15,6 @@ using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Features.Auth.Services;
-using Sicre.Api.Hubs;
 using Sicre.Api.Features.Branches.Services;
 using Sicre.Api.Features.ControlEntities.Services;
 using Sicre.Api.Features.GoogleDrive.Services;
@@ -28,6 +27,7 @@ using Sicre.Api.Features.Roles.Services;
 using Sicre.Api.Features.SICRESettings.Services;
 using Sicre.Api.Features.TwoFactor.Services;
 using Sicre.Api.Features.Users.Services;
+using Sicre.Api.Hubs;
 using Sicre.Api.Infrastructure.Hangfire;
 using Sicre.Api.Infrastructure.Jobs;
 using Sicre.Api.Infrastructure.Middleware;
@@ -105,7 +105,10 @@ builder
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+                if (
+                    !string.IsNullOrEmpty(accessToken)
+                    && path.StartsWithSegments("/hubs/notifications")
+                )
                     context.Token = accessToken;
                 return Task.CompletedTask;
             },
