@@ -157,6 +157,7 @@ builder.Services.AddScoped<IReportImportService, ReportImportService>();
 
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
+builder.Services.AddScoped<INotificationJobService, NotificationJobService>();
 
 // Seeders con dependencias
 builder.Services.AddScoped<AdminSeeder>();
@@ -232,6 +233,13 @@ RecurringJob.AddOrUpdate<IReportGenerationJobService>(
     job => job.RunAsync(),
     "0 11 * * *",
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
+);
+
+RecurringJob.AddOrUpdate<INotificationJobService>(
+    "daily-notifications",
+    job => job.RunDailyNotificationsAsync(),
+    "0 8 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
 );
 
 app.Run();

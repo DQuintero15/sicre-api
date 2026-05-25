@@ -19,6 +19,15 @@ public interface IEmailTemplateService
         bool isOverdue,
         string? branchName = null
     );
+    string GetReportAlertNotificationEmailTemplate(
+        string userName,
+        string reportName,
+        string periodName,
+        DateOnly dueDate,
+        string alertType,
+        string alertMessage,
+        string? branchName = null
+    );
     string GetReportsAssignedEmailTemplate(ReportsAssignedEmailDto data, Guid notificationId);
     string GetMonthlyStatusEmailTemplate(string userName, string monthName);
 }

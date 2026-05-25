@@ -65,6 +65,65 @@ internal static class ReportEmailTemplates
             """;
     }
 
+    internal static string ReportAlertNotification(
+        string userName,
+        string reportName,
+        string periodName,
+        DateOnly dueDate,
+        string alertType,
+        string alertMessage,
+        string frontendUrl,
+        string? branchName = null
+    )
+    {
+        var (color, label) = alertType switch
+        {
+            "Preventiva" => ("#28a745", "Preventiva"),
+            "Seguimiento" => ("#ffc107", "Seguimiento"),
+            "Riesgo" => ("#fd7e14", "Riesgo"),
+            "Crítica" => ("#dc3545", "Crítica"),
+            _ => ("#6c757d", alertType),
+        };
+
+        var branchRow = string.IsNullOrWhiteSpace(branchName)
+            ? ""
+            : $"<p style='margin:4px 0;font-size:14px;'><strong>Sede:</strong> {branchName}</p>";
+
+        return $"""
+            <html lang='es'>
+            <body style='margin:0;padding:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background-color:#f5f5f5;'>
+                <table width='100%' cellpadding='0' cellspacing='0' style='padding:40px 20px;'>
+                    <tr><td align='center'>
+                        <table width='600' cellpadding='0' cellspacing='0' style='background-color:#fff;border-radius:10px;box-shadow:0 3px 6px rgba(0,0,0,0.1);'>
+                            <tr><td style='background-color:{color};padding:4px 0;border-radius:10px 10px 0 0;'></td></tr>
+                            <tr><td style='text-align:center;padding:28px 30px 16px;'>
+                                <span style='background-color:{color};color:#fff;padding:5px 14px;border-radius:15px;font-size:12px;font-weight:700;letter-spacing:.5px;'>{label}</span>
+                                <h2 style='color:#1d1d1d;margin:14px 0 0;font-weight:600;font-size:18px;'>Alerta de Reporte</h2>
+                            </td></tr>
+                            <tr><td style='padding:10px 30px 30px;'>
+                                <p style='color:#333;font-size:15px;margin:0 0 18px;'>Hola <strong>{userName}</strong>,</p>
+                                <div style='background-color:#f8f9fa;border-left:4px solid {color};padding:14px 16px;margin-bottom:22px;border-radius:0 6px 6px 0;'>
+                                    <p style='margin:0;font-size:15px;color:#333;line-height:1.6;'>{alertMessage}</p>
+                                </div>
+                                <div style='border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;margin-bottom:24px;'>
+                                    <p style='margin:4px 0;font-size:14px;'><strong>Reporte:</strong> {reportName}</p>
+                                    <p style='margin:4px 0;font-size:14px;'><strong>Período:</strong> {periodName}</p>
+                                    <p style='margin:4px 0;font-size:14px;'><strong>Fecha de vencimiento:</strong> {dueDate:dd/MM/yyyy}</p>
+                                    {branchRow}
+                                </div>
+                                <div style='text-align:center;'>
+                                    <a href='{frontendUrl}' style='background:#1d3e81;color:#fff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;'>Ir a la plataforma</a>
+                                </div>
+                            </td></tr>
+                            <tr><td style='background-color:#f5f5f5;padding:18px;text-align:center;font-size:12px;color:#888;border-radius:0 0 10px 10px;'>© 2025 Grupo del Llano. Todos los derechos reservados.</td></tr>
+                        </table>
+                    </td></tr>
+                </table>
+            </body>
+            </html>
+            """;
+    }
+
     internal static string ReportsAssigned(
         ReportsAssignedEmailDto data,
         Guid notificationId,

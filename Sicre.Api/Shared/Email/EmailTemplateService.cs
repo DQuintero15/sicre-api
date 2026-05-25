@@ -44,6 +44,26 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
             branchName
         );
 
+    public string GetReportAlertNotificationEmailTemplate(
+        string userName,
+        string reportName,
+        string periodName,
+        DateOnly dueDate,
+        string alertType,
+        string alertMessage,
+        string? branchName = null
+    ) =>
+        ReportEmailTemplates.ReportAlertNotification(
+            userName,
+            reportName,
+            periodName,
+            dueDate,
+            alertType,
+            alertMessage,
+            _settings.FrontendUrl,
+            branchName
+        );
+
     public string GetReportsAssignedEmailTemplate(
         ReportsAssignedEmailDto data,
         Guid notificationId
