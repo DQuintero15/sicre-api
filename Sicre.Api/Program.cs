@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
+using Sicre.Api.Features.Analytics.Services;
 using Sicre.Api.Features.Auth.Services;
 using Sicre.Api.Features.Branches.Services;
 using Sicre.Api.Features.ControlEntities.Services;
@@ -187,6 +188,9 @@ builder.Services.AddHostedService<DriveUploadWorker>();
 // Notification feature services
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
+
+// Analytics feature
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 
 // SICRE Settings
 builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();

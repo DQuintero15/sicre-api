@@ -1,6 +1,6 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
@@ -151,10 +151,7 @@ public class ReportInstancesController(
 
     [HttpGet("{id:guid}/attachments/{uploadId:guid}/progress")]
     [AllowAnonymous]
-    public async Task GetAttachmentProgress(
-        Guid id,
-        Guid uploadId
-    )
+    public async Task GetAttachmentProgress(Guid id, Guid uploadId)
     {
         Response.Headers.Append("Content-Type", "text/event-stream");
 

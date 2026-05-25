@@ -50,7 +50,6 @@ public interface IReportInstanceService
         Guid userId,
         CancellationToken ct = default
     );
-
 }
 
 public class ReportInstanceService(
@@ -545,7 +544,9 @@ public class ReportInstanceService(
         return null;
     }
 
-    private static HashSet<string> BuildAllowedMimePrefixes(IEnumerable<ReportFormatType> formatTypes)
+    private static HashSet<string> BuildAllowedMimePrefixes(
+        IEnumerable<ReportFormatType> formatTypes
+    )
     {
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -558,7 +559,9 @@ public class ReportInstanceService(
                     break;
                 case ReportFormatType.Spreadsheet:
                     allowed.Add("application/vnd.ms-excel");
-                    allowed.Add("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    allowed.Add(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    );
                     allowed.Add("text/csv");
                     break;
                 case ReportFormatType.Archive:
