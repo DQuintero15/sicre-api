@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
@@ -173,13 +174,39 @@ public class ReportInstancesController(
     }
 
     [HttpGet("{id:guid}/attachments/{uploadId:guid}/progress")]
-    public async Task<ActionResult<ApiResponse<UploadProgress?>>> GetAttachmentProgress(
+    [AllowAnonymous]
+    public async Task GetAttachmentProgress(
         Guid id,
         Guid uploadId
     )
     {
-        var progress = await attachmentService.GetProgressAsync(uploadId);
-        return Ok(ApiResponse<UploadProgress?>.Ok(progress));
+        Response.Headers.Append("Content-Type", "text/event-stream");
+
+        while (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            var progress = await attachmentService.GetProgressAsync(uploadId);
+
+            if (progress is not null)
+            {
+                var payload = JsonSerializer.Serialize(progress.ToString());
+                await Response.WriteAsync($"data: {payload}\n\n");
+                await Response.Body.FlushAsync();
+
+                if (progress == UploadProgress.Completed || progress == UploadProgress.Failed)
+                {
+                    break;
+                }
+            }
+
+            try
+            {
+                await Task.Delay(1000, HttpContext.RequestAborted);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+        }
     }
 
     [HttpPost("{id:guid}/attachments/reversion")]

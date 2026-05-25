@@ -117,11 +117,16 @@ public class GoogleDriveController(
     public async Task<ActionResult<ApiResponse<GoogleDriveStatusDto>>> GetStatus()
     {
         var token = await db.GoogleDriveTokens.FirstOrDefaultAsync();
+
+        var isConnected = token is not null && !string.IsNullOrEmpty(token.RefreshToken);
+        var isExpired = token is not null && token.ExpiresAt <= DateTime.UtcNow;
+
         return FromResult(
             ApiResponse<GoogleDriveStatusDto>.Ok(
                 new GoogleDriveStatusDto
                 {
-                    IsConnected = token is not null,
+                    IsConnected = isConnected,
+                    IsTokenExpired = isConnected && isExpired,
                     TokenExpiresAt = token?.ExpiresAt,
                     UpdatedAt = token?.UpdatedAt,
                 }
