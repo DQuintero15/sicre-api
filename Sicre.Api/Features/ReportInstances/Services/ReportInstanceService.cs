@@ -51,12 +51,6 @@ public interface IReportInstanceService
         CancellationToken ct = default
     );
 
-    Task<ApiResponse<ReportInstanceResponse>> ExtendDeadlineAsync(
-        Guid id,
-        ExtendDeadlineRequest request,
-        Guid userId,
-        CancellationToken ct = default
-    );
 }
 
 public class ReportInstanceService(
@@ -456,9 +450,40 @@ public class ReportInstanceService(
                     "La instancia ya fue marcada como enviada."
                 );
 
+            var completedAttachments = await db
+                .ReportAttachments.Where(a =>
+                    a.ReportInstanceId == id
+                    && a.IsActive
+                    && a.UploadProgress == UploadProgress.Completed
+                )
+                .Select(a => new { a.Type, a.MimeType })
+                .ToListAsync(ct);
+
+            if (completedAttachments.Count == 0)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "La instancia debe tener al menos un adjunto cargado correctamente para marcarse como enviada."
+                );
+
+            var attachmentValidationMessage = ValidateAttachmentTypesForDelivery(
+                instance.Report?.FormatTypes,
+                completedAttachments.Select(x => (x.Type, x.MimeType))
+            );
+            if (attachmentValidationMessage is not null)
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    attachmentValidationMessage
+                );
+
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var sentDate = request.SentDate ?? today;
             var isLate = sentDate > instance.DueDate;
+
+            if (isLate && string.IsNullOrWhiteSpace(request.DelayReason))
+                return ApiResponse<ReportInstanceResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "Debes indicar el motivo de demora cuando la entrega es extemporánea."
+                );
 
             instance.SentDate = sentDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             instance.Status = isLate ? ReportStatus.SentLate : ReportStatus.SentOnTime;
@@ -488,61 +513,72 @@ public class ReportInstanceService(
         }
     }
 
-    public async Task<ApiResponse<ReportInstanceResponse>> ExtendDeadlineAsync(
-        Guid id,
-        ExtendDeadlineRequest request,
-        Guid userId,
-        CancellationToken ct = default
+    private static string? ValidateAttachmentTypesForDelivery(
+        IReadOnlyCollection<ReportFormatType>? formatTypes,
+        IEnumerable<(AttachmentType Type, string? MimeType)> attachments
     )
     {
-        try
+        var reportFormatTypes = formatTypes?.Count > 0 ? formatTypes : [ReportFormatType.Any];
+        if (reportFormatTypes.Contains(ReportFormatType.Any))
+            return null;
+
+        var allowedMimePrefixes = BuildAllowedMimePrefixes(reportFormatTypes);
+        if (allowedMimePrefixes.Count == 0)
+            return null;
+
+        foreach (var attachment in attachments)
         {
-            var instance = await db
-                .ReportInstances.Include(ri => ri.Report)
-                .Include(ri => ri.ResponsibleUser)
-                .Include(ri => ri.SupervisorUser)
-                .FirstOrDefaultAsync(ri => ri.Id == id, ct);
+            if (attachment.Type is not (AttachmentType.FinalReport or AttachmentType.Other))
+                continue;
 
-            if (instance is null)
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.NotFound,
-                    "Instancia de reporte no encontrada."
-                );
+            if (string.IsNullOrWhiteSpace(attachment.MimeType))
+                return "El adjunto final no tiene tipo de archivo identificado. Verifica los adjuntos cargados.";
 
-            if (instance.Status is ReportStatus.SentOnTime or ReportStatus.SentLate)
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "No se puede ampliar el plazo de una instancia ya enviada."
-                );
-
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            if (request.NewDueDate <= today)
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "La nueva fecha de vencimiento debe ser posterior a hoy."
-                );
-
-            instance.DueDate = request.NewDueDate;
-            instance.DueDateOverrideReason = request.Reason.Trim();
-            instance.Status = ReportStatus.Pending;
-            instance.UpdatedAt = DateTime.UtcNow;
-            instance.UpdatedByUserId = userId;
-
-            await db.SaveChangesAsync(ct);
-
-            return ApiResponse<ReportInstanceResponse>.Ok(
-                ToResponse(instance),
-                "Plazo de entrega ampliado exitosamente."
+            var isAllowed = allowedMimePrefixes.Any(prefix =>
+                attachment.MimeType.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
             );
+
+            if (!isAllowed)
+                return "Hay adjuntos finales que no cumplen los tipos permitidos del reporte.";
         }
-        catch (Exception ex)
+
+        return null;
+    }
+
+    private static HashSet<string> BuildAllowedMimePrefixes(IEnumerable<ReportFormatType> formatTypes)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var formatType in formatTypes)
         {
-            logger.LogError(ex, "Error al ampliar plazo de instancia {Id}", id);
-            return ApiResponse<ReportInstanceResponse>.Fail(
-                HttpStatusCode.InternalServerError,
-                "Error al ampliar el plazo de entrega."
-            );
+            switch (formatType)
+            {
+                case ReportFormatType.PDF:
+                    allowed.Add("application/pdf");
+                    break;
+                case ReportFormatType.Spreadsheet:
+                    allowed.Add("application/vnd.ms-excel");
+                    allowed.Add("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    allowed.Add("text/csv");
+                    break;
+                case ReportFormatType.Archive:
+                    allowed.Add("application/zip");
+                    allowed.Add("application/x-zip-compressed");
+                    allowed.Add("application/x-rar-compressed");
+                    allowed.Add("application/x-7z-compressed");
+                    break;
+                case ReportFormatType.StructuredData:
+                    allowed.Add("application/json");
+                    allowed.Add("application/xml");
+                    allowed.Add("text/xml");
+                    allowed.Add("text/csv");
+                    break;
+                case ReportFormatType.WebPlatform:
+                    break;
+            }
         }
+
+        return allowed;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────────

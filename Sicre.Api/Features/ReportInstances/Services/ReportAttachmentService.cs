@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.GoogleDrive.Services;
-using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
@@ -18,12 +17,6 @@ public interface IReportAttachmentService
         Stream fileStream,
         string fileName,
         string contentType,
-        Guid userId
-    );
-
-    Task<ApiResponse<ReportAttachmentResponse>> AddUrlAsync(
-        Guid instanceId,
-        AddUrlAttachmentRequest request,
         Guid userId
     );
 
@@ -52,6 +45,61 @@ public class ReportAttachmentService(
 ) : IReportAttachmentService
 {
     public async Task<ApiResponse<ReportAttachmentResponse>> AddFileAsync(
+        Guid instanceId,
+        AttachmentType type,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        Guid userId
+    )
+    {
+        if (type == AttachmentType.ReversionEvidence)
+            return ApiResponse<ReportAttachmentResponse>.Fail(
+                HttpStatusCode.BadRequest,
+                "Para este tipo de soporte, usa la opción de registrar reversión."
+            );
+
+        return await AddFileCoreAsync(instanceId, type, fileStream, fileName, contentType, userId);
+    }
+
+    public async Task<ApiResponse<ReportAttachmentResponse>> AddReversionFileAsync(
+        Guid instanceId,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        Guid userId,
+        string? notes
+    )
+    {
+        var result = await AddFileCoreAsync(
+            instanceId,
+            AttachmentType.ReversionEvidence,
+            fileStream,
+            fileName,
+            contentType,
+            userId
+        );
+
+        if (!result.Success || string.IsNullOrWhiteSpace(notes))
+            return result;
+
+        var instance = await db.ReportInstances.FirstOrDefaultAsync(i => i.Id == instanceId);
+        if (instance is null)
+            return result;
+
+        var sanitizedNotes = notes.Trim();
+        var entry = $"Reversión: {sanitizedNotes}";
+        instance.Observations = string.IsNullOrWhiteSpace(instance.Observations)
+            ? entry
+            : $"{instance.Observations}\n{entry}";
+        instance.UpdatedAt = DateTime.UtcNow;
+        instance.UpdatedByUserId = userId;
+        await db.SaveChangesAsync();
+
+        return result;
+    }
+
+    private async Task<ApiResponse<ReportAttachmentResponse>> AddFileCoreAsync(
         Guid instanceId,
         AttachmentType type,
         Stream fileStream,
@@ -161,8 +209,6 @@ public class ReportAttachmentService(
                     att.UploadProgress = UploadProgress.Completed;
                     await scopeDb.SaveChangesAsync(ct);
 
-                    File.Delete(tempPath);
-
                     logger.LogInformation(
                         "Adjunto {AttachmentId} subido a Drive exitosamente.",
                         attachmentId
@@ -177,12 +223,12 @@ public class ReportAttachmentService(
                             scope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                         var att = await scopeDb2.ReportAttachments.FirstOrDefaultAsync(
                             a => a.Id == attachmentId,
-                            ct
+                            CancellationToken.None
                         );
                         if (att is not null)
                         {
                             att.UploadProgress = UploadProgress.Failed;
-                            await scopeDb2.SaveChangesAsync(ct);
+                            await scopeDb2.SaveChangesAsync(CancellationToken.None);
                         }
                     }
                     catch (Exception inner)
@@ -200,6 +246,22 @@ public class ReportAttachmentService(
                         attachmentId
                     );
                 }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(tempPath))
+                            File.Delete(tempPath);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        logger.LogWarning(
+                            cleanupEx,
+                            "No se pudo limpiar archivo temporal para adjunto {AttachmentId}.",
+                            attachmentId
+                        );
+                    }
+                }
             });
 
             return ApiResponse<ReportAttachmentResponse>.Ok(
@@ -216,84 +278,6 @@ public class ReportAttachmentService(
             );
         }
     }
-
-    public async Task<ApiResponse<ReportAttachmentResponse>> AddUrlAsync(
-        Guid instanceId,
-        AddUrlAttachmentRequest request,
-        Guid userId
-    )
-    {
-        try
-        {
-            var instance = await db.ReportInstances.FirstOrDefaultAsync(i => i.Id == instanceId);
-            if (instance is null)
-                return ApiResponse<ReportAttachmentResponse>.Fail(
-                    HttpStatusCode.NotFound,
-                    "Instancia no encontrada."
-                );
-
-            if (
-                !Uri.TryCreate(request.Url, UriKind.Absolute, out var uri)
-                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            )
-                return ApiResponse<ReportAttachmentResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "La URL proporcionada no es válida."
-                );
-
-            var user = await db.Users.FindAsync(userId);
-            if (user is null)
-                return ApiResponse<ReportAttachmentResponse>.Fail(
-                    HttpStatusCode.NotFound,
-                    "Usuario no encontrado."
-                );
-
-            var attachment = new ReportAttachment
-            {
-                ReportInstanceId = instanceId,
-                Type = request.Type,
-                FileName = request.Name,
-                Url = request.Url.Trim(),
-                UploadProgress = UploadProgress.Completed,
-                UploadedByUserId = userId,
-                CreatedAt = DateTime.UtcNow,
-                IsActive = true,
-            };
-
-            db.ReportAttachments.Add(attachment);
-            await db.SaveChangesAsync();
-
-            return ApiResponse<ReportAttachmentResponse>.Ok(
-                ToResponse(attachment, user),
-                "Adjunto por URL registrado exitosamente."
-            );
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error en AddUrlAsync para instancia {InstanceId}.", instanceId);
-            return ApiResponse<ReportAttachmentResponse>.Fail(
-                HttpStatusCode.InternalServerError,
-                "Error al registrar el adjunto por URL."
-            );
-        }
-    }
-
-    public Task<ApiResponse<ReportAttachmentResponse>> AddReversionFileAsync(
-        Guid instanceId,
-        Stream fileStream,
-        string fileName,
-        string contentType,
-        Guid userId,
-        string? notes
-    ) =>
-        AddFileAsync(
-            instanceId,
-            AttachmentType.ReversionEvidence,
-            fileStream,
-            fileName,
-            contentType,
-            userId
-        );
 
     public async Task<ApiResponse<PagedResult<ReportAttachmentResponse>>> GetByInstanceAsync(
         Guid instanceId,

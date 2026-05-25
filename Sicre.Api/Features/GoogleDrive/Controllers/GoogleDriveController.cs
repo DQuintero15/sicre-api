@@ -16,7 +16,7 @@ using Sicre.Api.Shared;
 namespace Sicre.Api.Features.GoogleDrive.Controllers;
 
 [ApiController]
-[Route("api/google-drive")]
+[Route("api/google-drive-auth")]
 [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
 public class GoogleDriveController(
@@ -26,9 +26,10 @@ public class GoogleDriveController(
 ) : BaseController
 {
     private GoogleDriveSettings Settings => options.Value.GoogleDrive;
+    private string FrontendUrl => options.Value.FrontendUrl;
 
     /// <summary>Devuelve la URL de autorización de Google OAuth2 para conectar Drive.</summary>
-    [HttpGet("auth-url")]
+    [HttpGet("url")]
     public ActionResult<ApiResponse<string>> GetAuthUrl()
     {
         if (
@@ -55,11 +56,11 @@ public class GoogleDriveController(
         if (!string.IsNullOrWhiteSpace(error))
         {
             logger.LogWarning("Google Drive OAuth denegado: {Error}", error);
-            return BadRequest(new { message = $"Autorización denegada: {error}" });
+            return Redirect($"{FrontendUrl}?drive=error&reason={Uri.EscapeDataString(error)}");
         }
 
         if (string.IsNullOrWhiteSpace(code))
-            return BadRequest(new { message = "Código de autorización faltante." });
+            return Redirect($"{FrontendUrl}?drive=error&reason=missing_code");
 
         try
         {
@@ -100,15 +101,12 @@ public class GoogleDriveController(
 
             await db.SaveChangesAsync();
             logger.LogInformation("Google Drive conectado exitosamente.");
-            return Ok(new { message = "Google Drive conectado exitosamente." });
+            return Redirect($"{FrontendUrl}?drive=connected");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error al conectar Google Drive.");
-            return StatusCode(
-                500,
-                new { message = "Error al procesar la autorización de Google Drive." }
-            );
+            return Redirect($"{FrontendUrl}?drive=error&reason=unknown");
         }
     }
 
@@ -116,9 +114,23 @@ public class GoogleDriveController(
     [HttpGet("status")]
     public async Task<ActionResult<ApiResponse<GoogleDriveStatusDto>>> GetStatus()
     {
+        return await GetDriveStatus();
+    }
+
+    /// <summary>Alias legacy para mantener compatibilidad con clientes antiguos.</summary>
+    [HttpGet("~/api/google-drive/status")]
+    public async Task<ActionResult<ApiResponse<GoogleDriveStatusDto>>> GetLegacyStatus()
+    {
+        return await GetDriveStatus();
+    }
+
+    private async Task<ActionResult<ApiResponse<GoogleDriveStatusDto>>> GetDriveStatus()
+    {
         var token = await db.GoogleDriveTokens.FirstOrDefaultAsync();
 
-        var isConnected = token is not null && !string.IsNullOrEmpty(token.RefreshToken);
+        var hasRefreshToken = token is not null && !string.IsNullOrWhiteSpace(token.RefreshToken);
+        var hasAccessToken = token is not null && !string.IsNullOrWhiteSpace(token.AccessToken);
+        var isConnected = hasRefreshToken || hasAccessToken;
         var isExpired = token is not null && token.ExpiresAt <= DateTime.UtcNow;
 
         return FromResult(
@@ -135,8 +147,8 @@ public class GoogleDriveController(
     }
 
     /// <summary>Desconecta la cuenta de Google Drive eliminando el token almacenado.</summary>
-    [HttpDelete("disconnect")]
-    public async Task<ActionResult<ApiResponse<bool>>> Disconnect()
+    [HttpPost("disable")]
+    public async Task<ActionResult<ApiResponse<bool>>> Disable()
     {
         var token = await db.GoogleDriveTokens.FirstOrDefaultAsync();
         if (token is null)

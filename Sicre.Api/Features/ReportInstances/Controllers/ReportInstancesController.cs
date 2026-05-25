@@ -100,18 +100,6 @@ public class ReportInstancesController(
         return FromResult(result);
     }
 
-    [HttpPost("{id:guid}/extend-deadline")]
-    public async Task<ActionResult<ApiResponse<ReportInstanceResponse>>> ExtendDeadline(
-        Guid id,
-        [FromBody] ExtendDeadlineRequest request,
-        CancellationToken ct
-    )
-    {
-        var userId = GetUserId();
-        var result = await reportInstanceService.ExtendDeadlineAsync(id, request, userId, ct);
-        return FromResult(result);
-    }
-
     // ── Attachments ──────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/attachments")]
@@ -158,18 +146,6 @@ public class ReportInstancesController(
             file.ContentType,
             userId
         );
-        return FromResult(result);
-    }
-
-    [HttpPost("{id:guid}/attachments/url")]
-    public async Task<ActionResult<ApiResponse<ReportAttachmentResponse>>> AddUrlAttachment(
-        Guid id,
-        [FromBody] AddUrlAttachmentRequest request,
-        CancellationToken ct
-    )
-    {
-        var userId = GetUserId();
-        var result = await attachmentService.AddUrlAsync(id, request, userId);
         return FromResult(result);
     }
 
