@@ -19,7 +19,8 @@ namespace Sicre.Api.Migrations
                 defaultValue: 0,
                 oldClrType: typeof(int),
                 oldType: "integer",
-                oldDefaultValue: 1);
+                oldDefaultValue: 1
+            );
         }
 
         /// <inheritdoc />
@@ -34,7 +35,8 @@ namespace Sicre.Api.Migrations
                 defaultValue: 1,
                 oldClrType: typeof(int),
                 oldType: "integer",
-                oldDefaultValue: 0);
+                oldDefaultValue: 0
+            );
         }
     }
 }
