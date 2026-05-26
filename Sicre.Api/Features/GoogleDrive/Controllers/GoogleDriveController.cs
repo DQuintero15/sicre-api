@@ -12,6 +12,7 @@ using Sicre.Api.Features.GoogleDrive.Dtos;
 using Sicre.Api.Infrastructure.Attributes;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
+using System.Web;
 
 namespace Sicre.Api.Features.GoogleDrive.Controllers;
 
@@ -44,7 +45,8 @@ public class GoogleDriveController(
             );
 
         var flow = BuildFlow();
-        var url = flow.CreateAuthorizationCodeRequest(Settings.RedirectUri).Build().AbsoluteUri;
+        var baseUrl = flow.CreateAuthorizationCodeRequest(Settings.RedirectUri).Build().AbsoluteUri;
+        var url = BuildUniqueOAuthUrl(baseUrl);
         return FromResult(ApiResponse<string>.Ok(url));
     }
 
@@ -73,6 +75,17 @@ public class GoogleDriveController(
             );
 
             var existing = await db.GoogleDriveTokens.FirstOrDefaultAsync();
+            var hasIncomingRefreshToken = !string.IsNullOrWhiteSpace(tokenResponse.RefreshToken);
+            var hasExistingRefreshToken =
+                existing is not null && !string.IsNullOrWhiteSpace(existing.RefreshToken);
+
+            if (!hasIncomingRefreshToken && !hasExistingRefreshToken)
+            {
+                logger.LogWarning(
+                    "Google Drive OAuth callback sin refresh_token y sin token previo válido."
+                );
+                return Redirect($"{FrontendUrl}?drive=error&reason=requires_reconnect");
+            }
 
             if (existing is null)
             {
@@ -80,7 +93,7 @@ public class GoogleDriveController(
                     new GoogleDriveToken
                     {
                         AccessToken = tokenResponse.AccessToken,
-                        RefreshToken = tokenResponse.RefreshToken ?? string.Empty,
+                        RefreshToken = tokenResponse.RefreshToken!,
                         ExpiresAt = DateTime.UtcNow.AddSeconds(
                             tokenResponse.ExpiresInSeconds ?? 3600
                         ),
@@ -91,7 +104,7 @@ public class GoogleDriveController(
             else
             {
                 existing.AccessToken = tokenResponse.AccessToken;
-                if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
+                if (!string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
                     existing.RefreshToken = tokenResponse.RefreshToken;
                 existing.ExpiresAt = DateTime.UtcNow.AddSeconds(
                     tokenResponse.ExpiresInSeconds ?? 3600
@@ -129,8 +142,8 @@ public class GoogleDriveController(
         var token = await db.GoogleDriveTokens.FirstOrDefaultAsync();
 
         var hasRefreshToken = token is not null && !string.IsNullOrWhiteSpace(token.RefreshToken);
-        var hasAccessToken = token is not null && !string.IsNullOrWhiteSpace(token.AccessToken);
-        var isConnected = hasRefreshToken || hasAccessToken;
+        var requiresReconnect = token is not null && !hasRefreshToken;
+        var isConnected = hasRefreshToken;
         var isExpired = token is not null && token.ExpiresAt <= DateTime.UtcNow;
 
         return FromResult(
@@ -138,6 +151,7 @@ public class GoogleDriveController(
                 new GoogleDriveStatusDto
                 {
                     IsConnected = isConnected,
+                    RequiresReconnect = requiresReconnect,
                     IsTokenExpired = isConnected && isExpired,
                     TokenExpiresAt = token?.ExpiresAt,
                     UpdatedAt = token?.UpdatedAt,
@@ -177,4 +191,17 @@ public class GoogleDriveController(
                 Scopes = [DriveService.ScopeConstants.Drive],
             }
         );
+
+    private static string BuildUniqueOAuthUrl(string baseUrl)
+    {
+        var uriBuilder = new UriBuilder(baseUrl);
+        var query = HttpUtility.ParseQueryString(uriBuilder.Query);
+
+        query.Set("access_type", "offline");
+        query.Set("prompt", "consent");
+        query.Set("include_granted_scopes", "true");
+
+        uriBuilder.Query = query.ToString() ?? string.Empty;
+        return uriBuilder.Uri.AbsoluteUri;
+    }
 }

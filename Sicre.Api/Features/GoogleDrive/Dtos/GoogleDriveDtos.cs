@@ -3,6 +3,7 @@ namespace Sicre.Api.Features.GoogleDrive.Dtos;
 public class GoogleDriveStatusDto
 {
     public bool IsConnected { get; set; }
+    public bool RequiresReconnect { get; set; }
     public bool IsTokenExpired { get; set; }
     public DateTime? TokenExpiresAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

@@ -40,7 +40,7 @@ public interface IReportAttachmentService
 public class ReportAttachmentService(
     ApplicationDbContext db,
     IBackgroundQueueService backgroundQueue,
-    IServiceProvider serviceProvider,
+    IServiceScopeFactory scopeFactory,
     ILogger<ReportAttachmentService> logger
 ) : IReportAttachmentService
 {
@@ -164,7 +164,7 @@ public class ReportAttachmentService(
             {
                 try
                 {
-                    using var scope = serviceProvider.CreateScope();
+                    using var scope = scopeFactory.CreateScope();
                     var drive = scope.ServiceProvider.GetRequiredService<IGoogleDriveService>();
                     var scopeDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
@@ -218,7 +218,7 @@ public class ReportAttachmentService(
                 {
                     try
                     {
-                        using var scope2 = serviceProvider.CreateScope();
+                        using var scope2 = scopeFactory.CreateScope();
                         var scopeDb2 =
                             scope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                         var att = await scopeDb2.ReportAttachments.FirstOrDefaultAsync(

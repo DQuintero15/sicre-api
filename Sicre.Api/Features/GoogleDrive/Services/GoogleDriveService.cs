@@ -54,6 +54,11 @@ public class GoogleDriveService : IGoogleDriveService
                 "Google Drive no está configurado. Conecta la cuenta desde la configuración del sistema."
             );
 
+        if (string.IsNullOrWhiteSpace(token.RefreshToken))
+            throw new InvalidOperationException(
+                "La conexión de Google Drive requiere reconexión porque no tiene refresh token."
+            );
+
         var flow = new GoogleAuthorizationCodeFlow(
             new GoogleAuthorizationCodeFlow.Initializer
             {
