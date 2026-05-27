@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Sicre.Api.Config;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
@@ -18,7 +20,9 @@ namespace Sicre.Api.Features.ReportInstances.Controllers;
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
 public class ReportInstancesController(
     IReportInstanceService reportInstanceService,
-    IReportAttachmentService attachmentService
+    IReportAttachmentService attachmentService,
+    IReportInstanceNoteService noteService,
+    IOptions<AppSettings> options
 ) : BaseController
 {
     [HttpGet]
@@ -27,7 +31,7 @@ public class ReportInstancesController(
         CancellationToken ct
     )
     {
-        var result = await reportInstanceService.GetAllAsync(request, ct);
+        var result = await reportInstanceService.GetAllAsync(request, GetUserId(), GetUserRole(), ct);
         return FromResult(result);
     }
 
@@ -97,6 +101,50 @@ public class ReportInstancesController(
     {
         var userId = GetUserId();
         var result = await reportInstanceService.DeliverAsync(id, request, userId, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("bulk-deliver")]
+    public async Task<ActionResult<ApiResponse<BulkDeliverResponse>>> BulkDeliver(
+        [FromBody] BulkDeliverRequest request,
+        CancellationToken ct
+    )
+    {
+        if (!options.Value.Features.BulkDeliver)
+            return NotFound();
+
+        var userId = GetUserId();
+        var result = await reportInstanceService.BulkDeliverAsync(request, userId, ct);
+        return FromResult(result);
+    }
+
+    // ── Notes ────────────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/notes")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<NoteResponse>>>> GetNotes(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        if (!options.Value.Features.Notes)
+            return NotFound();
+
+        var result = await noteService.GetByInstanceAsync(id, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/notes")]
+    public async Task<ActionResult<ApiResponse<NoteResponse>>> AddNote(
+        Guid id,
+        [FromBody] CreateNoteRequest request,
+        CancellationToken ct
+    )
+    {
+        if (!options.Value.Features.Notes)
+            return NotFound();
+
+        var userId = GetUserId();
+        var result = await noteService.CreateAsync(id, request, userId, ct);
         return FromResult(result);
     }
 

@@ -99,26 +99,74 @@ public class UpdateReportRequestValidator : AbstractValidator<UpdateReportReques
                 RuleFor(x => x.DueDateDatesDefinition)
                     .NotEmpty()
                     .WithMessage("La definición de fechas es requerida.")
-                    .Must(BeValidJson)
+                    .Must(BeValidFixedDatesJson)
                     .WithMessage(
-                        "La definición de fechas debe ser JSON válido con formato [{\"month\":N,\"day\":N}]."
+                        "La definición de fechas debe ser JSON válido con formato [{\"month\":N,\"day\":N}] sin fechas duplicadas."
                     );
             }
         );
+
+        When(
+            x => x.NotificationEmails != null,
+            () =>
+                RuleFor(x => x.NotificationEmails)
+                    .Must(BeValidEmailList)
+                    .WithMessage(
+                        "NotificationEmails debe ser una lista de emails válidos separados por coma."
+                    )
+        );
     }
 
-    private static bool BeValidJson(string? value)
+    private static bool BeValidFixedDatesJson(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return false;
         try
         {
-            System.Text.Json.JsonDocument.Parse(value);
+            var doc = System.Text.Json.JsonDocument.Parse(value);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return false;
+
+            var seen = new HashSet<(int month, int day)>();
+            foreach (var element in doc.RootElement.EnumerateArray())
+            {
+                if (
+                    !element.TryGetProperty("month", out var monthEl)
+                    || !element.TryGetProperty("day", out var dayEl)
+                )
+                    return false;
+
+                var month = monthEl.GetInt32();
+                var day = dayEl.GetInt32();
+
+                if (month < 1 || month > 12 || day < 1 || day > 31)
+                    return false;
+
+                if (!seen.Add((month, day)))
+                    return false;
+            }
+
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex =
+        new(
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+            System.Text.RegularExpressions.RegexOptions.Compiled
+                | System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        );
+
+    private static bool BeValidEmailList(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        var emails = value.Split(',', System.StringSplitOptions.RemoveEmptyEntries);
+        return emails.All(e => EmailRegex.IsMatch(e.Trim()));
     }
 }

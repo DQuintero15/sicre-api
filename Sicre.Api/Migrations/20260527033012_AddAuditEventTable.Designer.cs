@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Sicre.Api.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Sicre.Api.Infrastructure.Persistence;
 namespace Sicre.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260527033012_AddAuditEventTable")]
+    partial class AddAuditEventTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -823,40 +826,6 @@ namespace Sicre.Api.Migrations
                     b.ToTable("report_instances", "reports");
                 });
 
-            modelBuilder.Entity("Sicre.Api.Domain.Entities.ReportInstanceNote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamptz")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsVisibleToResponsible")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("ReportInstanceId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ReportInstanceId")
-                        .HasDatabaseName("IX_ReportInstanceNotes_InstanceId");
-
-                    b.ToTable("report_instance_notes", "reports");
-                });
-
             modelBuilder.Entity("Sicre.Api.Domain.Entities.ReportReversion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1266,25 +1235,6 @@ namespace Sicre.Api.Migrations
                     b.Navigation("UpdatedByUser");
                 });
 
-            modelBuilder.Entity("Sicre.Api.Domain.Entities.ReportInstanceNote", b =>
-                {
-                    b.HasOne("Sicre.Api.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Sicre.Api.Domain.Entities.ReportInstance", "ReportInstance")
-                        .WithMany("Notes")
-                        .HasForeignKey("ReportInstanceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("ReportInstance");
-                });
-
             modelBuilder.Entity("Sicre.Api.Domain.Entities.ReportReversion", b =>
                 {
                     b.HasOne("Sicre.Api.Domain.Entities.User", "CreatedByUser")
@@ -1356,8 +1306,6 @@ namespace Sicre.Api.Migrations
             modelBuilder.Entity("Sicre.Api.Domain.Entities.ReportInstance", b =>
                 {
                     b.Navigation("Attachments");
-
-                    b.Navigation("Notes");
 
                     b.Navigation("Notifications");
 

@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Audit.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Services;
@@ -14,6 +15,8 @@ public interface IReportInstanceService
 {
     Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid currentUserId,
+        Role currentUserRole,
         CancellationToken ct = default
     );
 
@@ -50,22 +53,50 @@ public interface IReportInstanceService
         Guid userId,
         CancellationToken ct = default
     );
+
+    Task<ApiResponse<BulkDeliverResponse>> BulkDeliverAsync(
+        BulkDeliverRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    );
 }
 
 public class ReportInstanceService(
     ApplicationDbContext db,
     ILogger<ReportInstanceService> logger,
-    IReportInstanceGenerator generator
+    IReportInstanceGenerator generator,
+    IAuditService auditService
 ) : IReportInstanceService
 {
     public async Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid currentUserId,
+        Role currentUserRole,
         CancellationToken ct = default
     )
     {
         try
         {
             var query = db.ReportInstances.Include(ri => ri.Report).AsQueryable();
+
+            if (currentUserRole == Role.ReportResponsible)
+            {
+                query = query.Where(ri =>
+                    ri.ResponsibleUserId == currentUserId || ri.SupervisorUserId == currentUserId
+                );
+            }
+            else if (currentUserRole == Role.ComplianceSupervisor)
+            {
+                var supervisorBranchId = await db
+                    .Users.Where(u => u.Id == currentUserId)
+                    .Select(u => u.BranchId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (supervisorBranchId.HasValue)
+                    query = query.Where(ri =>
+                        ri.Report != null && ri.Report.BranchId == supervisorBranchId
+                    );
+            }
 
             if (request.ReportId.HasValue)
                 query = query.Where(ri => ri.ReportId == request.ReportId.Value);
@@ -124,6 +155,8 @@ public class ReportInstanceService(
                 .ReportInstances.Include(ri => ri.Report)
                 .Include(ri => ri.ResponsibleUser)
                 .Include(ri => ri.SupervisorUser)
+                .Include(ri => ri.Reversions)
+                .ThenInclude(r => r.CreatedByUser)
                 .FirstOrDefaultAsync(ri => ri.Id == id, ct);
 
             if (instance is null)
@@ -304,6 +337,8 @@ public class ReportInstanceService(
                     "No se puede modificar una instancia ya enviada."
                 );
 
+            var isReassignment = request.ResponsibleUserId.HasValue || request.SupervisorUserId.HasValue;
+
             if (request.DueDate.HasValue)
             {
                 instance.DueDate = request.DueDate.Value;
@@ -330,6 +365,14 @@ public class ReportInstanceService(
 
             instance.UpdatedAt = DateTime.UtcNow;
             instance.UpdatedByUserId = updatedByUserId;
+
+            auditService.Log(
+                entityType: "ReportInstance",
+                entityId: instance.Id,
+                action: isReassignment ? AuditAction.Reassign : AuditAction.Update,
+                performedByUserId: updatedByUserId,
+                branchId: instance.Report?.BranchId
+            );
 
             await db.SaveChangesAsync(ct);
 
@@ -405,6 +448,17 @@ public class ReportInstanceService(
             };
 
             db.ReportReversions.Add(reversion);
+
+            auditService.Log(
+                entityType: "ReportInstance",
+                entityId: instance.Id,
+                action: AuditAction.Revert,
+                performedByUserId: revertedByUserId,
+                oldValues: new { status = previousStatus.ToString() },
+                newValues: new { status = newStatus.ToString(), reason = request.Reason },
+                branchId: instance.Report?.BranchId
+            );
+
             await db.SaveChangesAsync(ct);
 
             return ApiResponse<ReportInstanceResponse>.Ok(
@@ -443,55 +497,29 @@ public class ReportInstanceService(
                     "Instancia de reporte no encontrada."
                 );
 
-            if (instance.Status is ReportStatus.SentOnTime or ReportStatus.SentLate)
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "La instancia ya fue marcada como enviada."
-                );
-
-            var completedAttachments = await db
-                .ReportAttachments.Where(a =>
-                    a.ReportInstanceId == id
-                    && a.IsActive
-                    && a.UploadProgress == UploadProgress.Completed
-                )
-                .Select(a => new { a.Type, a.MimeType })
-                .ToListAsync(ct);
-
-            if (completedAttachments.Count == 0)
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "La instancia debe tener al menos un adjunto cargado correctamente para marcarse como enviada."
-                );
-
-            var attachmentValidationMessage = ValidateAttachmentTypesForDelivery(
-                instance.Report?.FormatTypes,
-                completedAttachments.Select(x => (x.Type, x.MimeType))
+            var (validationError, isLate) = await ValidateAndPrepareDelivery(
+                instance,
+                request.SentDate,
+                request.DelayReason,
+                ct
             );
-            if (attachmentValidationMessage is not null)
+
+            if (validationError is not null)
                 return ApiResponse<ReportInstanceResponse>.Fail(
                     HttpStatusCode.BadRequest,
-                    attachmentValidationMessage
+                    validationError
                 );
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var sentDate = request.SentDate ?? today;
-            var isLate = sentDate > instance.DueDate;
+            ApplyDelivery(instance, request.SentDate, request.DelayReason, userId, isLate);
 
-            if (isLate && string.IsNullOrWhiteSpace(request.DelayReason))
-                return ApiResponse<ReportInstanceResponse>.Fail(
-                    HttpStatusCode.BadRequest,
-                    "Debes indicar el motivo de demora cuando la entrega es extemporánea."
-                );
-
-            instance.SentDate = sentDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            instance.Status = isLate ? ReportStatus.SentLate : ReportStatus.SentOnTime;
-
-            if (isLate && !string.IsNullOrWhiteSpace(request.DelayReason))
-                instance.DelayReason = request.DelayReason.Trim();
-
-            instance.UpdatedAt = DateTime.UtcNow;
-            instance.UpdatedByUserId = userId;
+            auditService.Log(
+                entityType: "ReportInstance",
+                entityId: instance.Id,
+                action: AuditAction.Deliver,
+                performedByUserId: userId,
+                newValues: new { sentDate = instance.SentDate, status = instance.Status.ToString() },
+                branchId: instance.Report?.BranchId
+            );
 
             await db.SaveChangesAsync(ct);
 
@@ -510,6 +538,146 @@ public class ReportInstanceService(
                 "Error al registrar el envío."
             );
         }
+    }
+
+    public async Task<ApiResponse<BulkDeliverResponse>> BulkDeliverAsync(
+        BulkDeliverRequest request,
+        Guid userId,
+        CancellationToken ct = default
+    )
+    {
+        try
+        {
+            if (request.InstanceIds.Count == 0)
+                return ApiResponse<BulkDeliverResponse>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "Debes indicar al menos una instancia."
+                );
+
+            var instances = await db
+                .ReportInstances.Include(ri => ri.Report)
+                .Where(ri => request.InstanceIds.Contains(ri.Id))
+                .ToListAsync(ct);
+
+            var response = new BulkDeliverResponse();
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            foreach (var id in request.InstanceIds)
+            {
+                var instance = instances.FirstOrDefault(i => i.Id == id);
+
+                if (instance is null)
+                {
+                    response.Results.Add(new BulkDeliverItemResult { InstanceId = id, Success = false, Reason = "Instancia no encontrada." });
+                    continue;
+                }
+
+                var (validationError, isLate) = await ValidateAndPrepareDelivery(
+                    instance,
+                    sentDate: null,
+                    delayReason: null,
+                    ct
+                );
+
+                if (validationError is not null)
+                {
+                    response.Results.Add(new BulkDeliverItemResult { InstanceId = id, Success = false, Reason = validationError });
+                    continue;
+                }
+
+                ApplyDelivery(instance, sentDate: null, delayReason: null, userId, isLate);
+
+                auditService.Log(
+                    entityType: "ReportInstance",
+                    entityId: instance.Id,
+                    action: AuditAction.BulkDeliver,
+                    performedByUserId: userId,
+                    newValues: new { sentDate = instance.SentDate, status = instance.Status.ToString() },
+                    branchId: instance.Report?.BranchId
+                );
+
+                response.Results.Add(new BulkDeliverItemResult { InstanceId = id, Success = true });
+            }
+
+            if (response.SuccessCount > 0)
+                await db.SaveChangesAsync(ct);
+
+            return ApiResponse<BulkDeliverResponse>.Ok(
+                response,
+                $"{response.SuccessCount} instancia(s) entregada(s), {response.FailureCount} con error."
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error en entrega masiva");
+            return ApiResponse<BulkDeliverResponse>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error al procesar la entrega masiva."
+            );
+        }
+    }
+
+    private async Task<(string? error, bool isLate)> ValidateAndPrepareDelivery(
+        ReportInstance instance,
+        DateOnly? sentDate,
+        string? delayReason,
+        CancellationToken ct
+    )
+    {
+        if (instance.Status is ReportStatus.SentOnTime or ReportStatus.SentLate)
+            return ("La instancia ya fue marcada como enviada.", false);
+
+        var completedAttachments = await db
+            .ReportAttachments.Where(a =>
+                a.ReportInstanceId == instance.Id
+                && a.IsActive
+                && a.UploadProgress == UploadProgress.Completed
+            )
+            .Select(a => new { a.Type, a.MimeType })
+            .ToListAsync(ct);
+
+        if (completedAttachments.Count == 0)
+            return (
+                "La instancia debe tener al menos un adjunto cargado correctamente para marcarse como enviada.",
+                false
+            );
+
+        var attachmentError = ValidateAttachmentTypesForDelivery(
+            instance.Report?.FormatTypes,
+            completedAttachments.Select(x => (x.Type, x.MimeType))
+        );
+        if (attachmentError is not null)
+            return (attachmentError, false);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var effectiveSentDate = sentDate ?? today;
+        var isLate = effectiveSentDate > instance.DueDate;
+
+        if (isLate && string.IsNullOrWhiteSpace(delayReason))
+            return ("Debes indicar el motivo de demora cuando la entrega es extemporánea.", false);
+
+        return (null, isLate);
+    }
+
+    private static void ApplyDelivery(
+        ReportInstance instance,
+        DateOnly? sentDate,
+        string? delayReason,
+        Guid userId,
+        bool isLate
+    )
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var effectiveSentDate = sentDate ?? today;
+
+        instance.SentDate = effectiveSentDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        instance.Status = isLate ? ReportStatus.SentLate : ReportStatus.SentOnTime;
+
+        if (isLate && !string.IsNullOrWhiteSpace(delayReason))
+            instance.DelayReason = delayReason.Trim();
+
+        instance.UpdatedAt = DateTime.UtcNow;
+        instance.UpdatedByUserId = userId;
     }
 
     private static string? ValidateAttachmentTypesForDelivery(
@@ -699,6 +867,21 @@ public class ReportInstanceService(
                 : null,
             CreatedAt = ri.CreatedAt,
             UpdatedAt = ri.UpdatedAt,
+            Reversions = ri.Reversions
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ReversionResponse
+                {
+                    Id = r.Id,
+                    PreviousStatus = r.PreviousStatus,
+                    NewStatus = r.NewStatus,
+                    Reason = r.Reason,
+                    CreatedByUserId = r.CreatedByUserId,
+                    CreatedByUserName = r.CreatedByUser is not null
+                        ? $"{r.CreatedByUser.FirstName} {r.CreatedByUser.LastName}"
+                        : null,
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToList(),
         };
 
     private static ReportInstanceSummaryResponse ToSummary(ReportInstance ri) =>

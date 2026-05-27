@@ -21,6 +21,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<GoogleDriveToken> GoogleDriveTokens => Set<GoogleDriveToken>();
     public DbSet<SICRESettings> SICRESettings => Set<SICRESettings>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<ReportInstanceNote> ReportInstanceNotes => Set<ReportInstanceNote>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

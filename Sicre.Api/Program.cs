@@ -15,6 +15,7 @@ using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Features.Analytics.Services;
+using Sicre.Api.Features.Audit.Services;
 using Sicre.Api.Features.Auth.Services;
 using Sicre.Api.Features.Branches.Services;
 using Sicre.Api.Features.ControlEntities.Services;
@@ -176,6 +177,7 @@ builder.Services.AddScoped<IControlEntityService, ControlEntityService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IReportInstanceGenerator, ReportInstanceGenerator>();
 builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
+builder.Services.AddScoped<IReportInstanceNoteService, ReportInstanceNoteService>();
 builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
 builder.Services.AddScoped<IReportImportService, ReportImportService>();
 builder.Services.AddScoped<IReportAttachmentService, ReportAttachmentService>();
@@ -189,6 +191,10 @@ builder.Services.AddHostedService<DriveUploadWorker>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
 
+// Audit feature services
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+
 // Analytics feature
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 
@@ -198,6 +204,7 @@ builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
 builder.Services.AddScoped<INotificationJobService, NotificationJobService>();
+builder.Services.AddScoped<IMonthlyReportJobService, MonthlyReportJobService>();
 
 // Seeders con dependencias
 builder.Services.AddScoped<AdminSeeder>();
@@ -280,6 +287,13 @@ RecurringJob.AddOrUpdate<INotificationJobService>(
     "daily-notifications",
     job => job.RunDailyNotificationsAsync(),
     "0 8 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
+);
+
+RecurringJob.AddOrUpdate<IMonthlyReportJobService>(
+    "monthly-report",
+    job => job.RunAsync(),
+    "0 8 1 * *",
     new RecurringJobOptions { TimeZone = colombiaZone }
 );
 

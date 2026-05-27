@@ -57,7 +57,7 @@ public class ReportsController(IReportService reportService) : BaseController
     )
     {
         var userId = GetUserId();
-        var result = await reportService.UpdateAsync(id, request, userId, ct);
+        var result = await reportService.UpdateAsync(id, request, userId, GetUserRole(), ct);
         return FromResult(result);
     }
 

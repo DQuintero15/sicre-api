@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Sicre.Api.Domain.Enums;
 using Sicre.Api.Shared;
 
 namespace Sicre.Api.Features.Auth.Controllers;
@@ -15,6 +16,16 @@ public abstract class BaseController : ControllerBase
         if (claim == null || !Guid.TryParse(claim.Value, out var userId))
             throw new UnauthorizedAccessException("User ID claim is missing or invalid.");
         return userId;
+    }
+
+    protected Role GetUserRole()
+    {
+        foreach (Role role in Enum.GetValues<Role>())
+        {
+            if (User.IsInRole(role.ToString()))
+                return role;
+        }
+        return Role.ReportResponsible;
     }
 
     protected ActionResult<ApiResponse<T>> FromResult<T>(ApiResponse<T> result) =>

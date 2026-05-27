@@ -7,8 +7,16 @@ public class AppSettings
     public CorsSettings Cors { get; set; } = new();
     public GoogleDriveSettings GoogleDrive { get; set; } = new();
     public SeedSettings Seed { get; set; } = new();
+    public FeatureFlags Features { get; set; } = new();
     public string FrontendUrl { get; set; } = string.Empty;
     public string BackendUrl { get; set; } = string.Empty;
+}
+
+public class FeatureFlags
+{
+    public bool GlobalAudit { get; set; } = true;
+    public bool BulkDeliver { get; set; } = false;
+    public bool Notes { get; set; } = false;
 }
 
 public class JwtSettings

@@ -36,4 +36,5 @@ public class ReportInstance
     public ICollection<ReportAttachment> Attachments { get; set; } = [];
     public ICollection<Notification> Notifications { get; set; } = [];
     public ICollection<ReportReversion> Reversions { get; set; } = [];
+    public ICollection<ReportInstanceNote> Notes { get; set; } = [];
 }

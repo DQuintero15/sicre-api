@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Audit.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Features.Reports.Dtos.Responses;
@@ -29,6 +30,7 @@ public interface IReportService
         Guid id,
         UpdateReportRequest request,
         Guid updatedByUserId,
+        Role updatedByUserRole,
         CancellationToken ct = default
     );
 
@@ -43,7 +45,8 @@ public class ReportService(
     ApplicationDbContext db,
     ILogger<ReportService> logger,
     IReportInstanceGenerator generator,
-    IDateHelper dateHelper
+    IDateHelper dateHelper,
+    IAuditService auditService
 ) : IReportService
 {
     public async Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
@@ -248,6 +251,7 @@ public class ReportService(
         Guid id,
         UpdateReportRequest request,
         Guid updatedByUserId,
+        Role updatedByUserRole,
         CancellationToken ct = default
     )
     {
@@ -267,6 +271,33 @@ public class ReportService(
                     HttpStatusCode.NotFound,
                     "Reporte no encontrado."
                 );
+
+            var touchesSensitiveFields =
+                request.Frequency.HasValue
+                || request.GenerationMode.HasValue
+                || request.DueDateRuleType.HasValue
+                || request.DueDateDay.HasValue
+                || request.DueDateMonth.HasValue
+                || request.DueDateDatesDefinition is not null;
+
+            if (touchesSensitiveFields && updatedByUserRole != Role.Administrator)
+            {
+                var hasClosedInstances = await db.ReportInstances.AnyAsync(
+                    ri =>
+                        ri.ReportId == id
+                        && (
+                            ri.Status == ReportStatus.SentOnTime
+                            || ri.Status == ReportStatus.SentLate
+                        ),
+                    ct
+                );
+
+                if (hasClosedInstances)
+                    return ApiResponse<ReportResponse>.Fail(
+                        HttpStatusCode.Forbidden,
+                        "Solo un Administrador puede modificar campos de periodicidad o vencimiento cuando existen instancias ya enviadas."
+                    );
+            }
 
             if (request.Code != null)
                 report.Code = request.Code;
@@ -315,6 +346,14 @@ public class ReportService(
 
             report.UpdatedAt = DateTime.UtcNow;
             report.UpdatedByUserId = updatedByUserId;
+
+            auditService.Log(
+                entityType: "Report",
+                entityId: report.Id,
+                action: touchesSensitiveFields ? AuditAction.UpdateSensitiveField : AuditAction.Update,
+                performedByUserId: updatedByUserId,
+                branchId: report.BranchId
+            );
 
             await db.SaveChangesAsync(ct);
 
