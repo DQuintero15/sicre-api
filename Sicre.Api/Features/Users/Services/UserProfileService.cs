@@ -24,7 +24,12 @@ public class UserProfileService(
     {
         try
         {
-            var user = await userManager.FindByIdAsync(userId.ToString());
+            var user = await db.Users
+                .Include(u => u.Position)
+                .Include(u => u.Process)
+                .Include(u => u.Branch)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
                 return ApiResponse<ProfileDto>.Fail(
@@ -34,9 +39,15 @@ public class UserProfileService(
 
             var roles = await userManager.GetRolesAsync(user);
 
-            return ApiResponse<ProfileDto>.Ok(
-                new ProfileDto($"{user.FirstName} {user.LastName}", roles)
-            );
+            return ApiResponse<ProfileDto>.Ok(new ProfileDto(
+                user.Id,
+                $"{user.FirstName} {user.LastName}",
+                roles,
+                user.Email,
+                user.Position?.Name,
+                user.Process?.Name,
+                user.Branch?.Name
+            ));
         }
         catch (Exception ex)
         {

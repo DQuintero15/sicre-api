@@ -6,4 +6,5 @@ public class AnalyticsFilterRequest
     public DateOnly? EndDate { get; set; }
     public Guid? ControlEntityId { get; set; }
     public Guid? ResponsibleUserId { get; set; }
+    public Guid? BranchId { get; set; }
 }

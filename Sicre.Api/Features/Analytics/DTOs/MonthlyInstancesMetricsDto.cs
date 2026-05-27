@@ -21,6 +21,7 @@ public class MonthMetricsDto
 public class CalendarInstanceDto
 {
     public Guid Id { get; set; }
+    public Guid? ReportId { get; set; }
     public string ReportCode { get; set; } = string.Empty;
     public string ReportName { get; set; } = string.Empty;
     public string DueDate { get; set; } = string.Empty;

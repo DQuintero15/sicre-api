@@ -60,6 +60,11 @@ public class AnalyticsService(
         if (filter.ResponsibleUserId.HasValue)
             query = query.Where(i => i.ResponsibleUserId == filter.ResponsibleUserId.Value);
 
+        if (filter.BranchId.HasValue)
+            query = query.Where(i =>
+                i.Report != null && i.Report.BranchId == filter.BranchId.Value
+            );
+
         return query;
     }
 
@@ -331,6 +336,7 @@ public class AnalyticsService(
                 .Select(i => new
                 {
                     i.Id,
+                    ReportId = i.ReportId,
                     ReportCode = i.Report != null ? i.Report.Code : string.Empty,
                     ReportName = i.Report != null ? i.Report.Name : string.Empty,
                     i.DueDate,
@@ -373,6 +379,7 @@ public class AnalyticsService(
                                 return new CalendarInstanceDto
                                 {
                                     Id = i.Id,
+                                    ReportId = i.ReportId,
                                     ReportCode = i.ReportCode,
                                     ReportName = i.ReportName,
                                     DueDate = i.DueDate.ToString("yyyy-MM-dd"),

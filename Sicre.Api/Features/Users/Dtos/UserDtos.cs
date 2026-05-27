@@ -57,6 +57,12 @@ public class UserFilterDto : PagedRequestDto
     public Role? Role { get; set; }
 }
 
+public sealed record ChangePasswordDto(
+    string CurrentPassword,
+    string NewPassword,
+    string ConfirmPassword
+);
+
 public class ImportUsersFromCsvResponseDto
 {
     public int TotalRows { get; set; }
