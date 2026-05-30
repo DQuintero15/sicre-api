@@ -14,6 +14,7 @@ internal static class ReportEmailTemplates
         int daysRemaining,
         bool isOverdue,
         string frontendUrl,
+        string backendUrl,
         string? branchName = null
     )
     {
@@ -52,7 +53,7 @@ internal static class ReportEmailTemplates
             </table>
             <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Por favor asegurese de gestionar este reporte antes de la fecha limite.</p>
             <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:12px 40px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ir a la plataforma</a>
-            """);
+            """, backendUrl);
     }
 
     internal static string ReportAlertNotification(
@@ -111,7 +112,7 @@ internal static class ReportEmailTemplates
             </table>
             <a href="{{instanceUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ver reporte en SICRE</a>
             <img src="{{pixelUrl}}" width="1" height="1" alt="" style="display:none;" />
-            """);
+            """, backendUrl);
     }
 
     internal static string ReportsAssigned(
@@ -176,6 +177,6 @@ internal static class ReportEmailTemplates
             <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">Para mas informacion, accede a la plataforma:</p>
             <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:10px 30px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Acceder a SICRE</a>
             <img src="{{backendUrl}}/api/notification/{{notificationId}}/mark-as-read" width="1" height="1" alt="" style="display:none;" />
-            """);
+            """, backendUrl);
     }
 }

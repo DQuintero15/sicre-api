@@ -12,16 +12,16 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
     private readonly AppSettings _settings = options.Value;
 
     public string GetInvitationEmailTemplate(string fullName, string temporaryPassword) =>
-        AuthEmailTemplates.Invitation(fullName, temporaryPassword, _settings.FrontendUrl);
+        AuthEmailTemplates.Invitation(fullName, temporaryPassword, _settings.FrontendUrl, _settings.BackendUrl);
 
     public string GetPasswordResetEmailTemplate(string fullName, string resetLink) =>
-        AuthEmailTemplates.PasswordReset(fullName, resetLink);
+        AuthEmailTemplates.PasswordReset(fullName, resetLink, _settings.BackendUrl);
 
     public string GetLoginNotificationEmailTemplate(LoginNotificationEmailDto data) =>
-        AuthEmailTemplates.LoginNotification(data);
+        AuthEmailTemplates.LoginNotification(data, _settings.BackendUrl);
 
     public string GetEmailChangedNotificationTemplate(string fullName, string newEmail) =>
-        AuthEmailTemplates.EmailChanged(fullName, newEmail, _settings.FrontendUrl);
+        AuthEmailTemplates.EmailChanged(fullName, newEmail, _settings.FrontendUrl, _settings.BackendUrl);
 
     public string GetReportAlertEmailTemplate(
         string userName,
@@ -42,6 +42,7 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
             daysRemaining,
             isOverdue,
             _settings.FrontendUrl,
+            _settings.BackendUrl,
             branchName
         );
 
@@ -82,7 +83,7 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
         );
 
     public string GetMonthlyStatusEmailTemplate(string userName, string monthName) =>
-        NotificationEmailTemplates.MonthlyStatus(userName, monthName, _settings.FrontendUrl);
+        NotificationEmailTemplates.MonthlyStatus(userName, monthName, _settings.FrontendUrl, _settings.BackendUrl);
 
     public string GetInstanceEventEmailTemplate(
         string userName,
@@ -97,9 +98,10 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
             title,
             content,
             instanceId,
-            _settings.FrontendUrl
+            _settings.FrontendUrl,
+            _settings.BackendUrl
         );
 
     public string GetMonthlyReportEmailTemplate(string periodLabel) =>
-        MonthlyReportTpl.Build(periodLabel, _settings.FrontendUrl);
+        MonthlyReportTpl.Build(periodLabel, _settings.FrontendUrl, _settings.BackendUrl);
 }
