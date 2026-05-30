@@ -57,7 +57,8 @@ public interface IReportInstanceService
 public class ReportInstanceService(
     ApplicationDbContext db,
     ILogger<ReportInstanceService> logger,
-    IReportInstanceGenerator generator
+    IReportInstanceGenerator generator,
+    IAuditLogService auditLog
 ) : IReportInstanceService
 {
     public async Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
@@ -420,6 +421,15 @@ public class ReportInstanceService(
             db.ReportReversions.Add(reversion);
             await db.SaveChangesAsync(ct);
 
+            var reverterName = await GetUserNameAsync(revertedByUserId);
+            await auditLog.RecordAsync(
+                "Reverted",
+                instance.Id,
+                revertedByUserId,
+                $"{reverterName} revirtió la instancia. Motivo: {request.Reason}",
+                new { previousStatus = previousStatus.ToString(), newStatus = newStatus.ToString(), reason = request.Reason }
+            );
+
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
                 "Instancia de reporte revertida exitosamente."
@@ -507,6 +517,16 @@ public class ReportInstanceService(
             instance.UpdatedByUserId = userId;
 
             await db.SaveChangesAsync(ct);
+
+            var delivererName = await GetUserNameAsync(userId);
+            var statusLabel = isLate ? "tarde" : "a tiempo";
+            await auditLog.RecordAsync(
+                "Delivered",
+                instance.Id,
+                userId,
+                $"{delivererName} marcó la instancia como enviada {statusLabel}.",
+                isLate ? new { delayReason = request.DelayReason } : null
+            );
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
@@ -598,6 +618,12 @@ public class ReportInstanceService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────────
+
+    private async Task<string> GetUserNameAsync(Guid userId)
+    {
+        var user = await db.Users.FindAsync(userId);
+        return user is not null ? $"{user.FirstName} {user.LastName}" : "Usuario";
+    }
 
     private static int? DerivePeriodMonth(ReportFrequency frequency, int month) =>
         frequency switch

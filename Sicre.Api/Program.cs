@@ -179,6 +179,7 @@ builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
 builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
 builder.Services.AddScoped<IReportImportService, ReportImportService>();
 builder.Services.AddScoped<IReportAttachmentService, ReportAttachmentService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // Google Drive
 builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();

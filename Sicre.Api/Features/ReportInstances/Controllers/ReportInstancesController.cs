@@ -5,6 +5,7 @@ using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
+using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.ReportInstances.Services;
 using Sicre.Api.Features.Reports.Services;
 using Sicre.Api.Infrastructure.Attributes;
@@ -18,7 +19,8 @@ namespace Sicre.Api.Features.ReportInstances.Controllers;
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
 public class ReportInstancesController(
     IReportInstanceService reportInstanceService,
-    IReportAttachmentService attachmentService
+    IReportAttachmentService attachmentService,
+    IAuditLogService auditLogService
 ) : BaseController
 {
     [HttpGet]
@@ -116,6 +118,15 @@ public class ReportInstancesController(
         return FromResult(result);
     }
 
+    [HttpGet("{id:guid}/attachments/history")]
+    public async Task<
+        ActionResult<ApiResponse<PagedResult<ReportAttachmentResponse>>>
+    > GetAttachmentsHistory(Guid id, CancellationToken ct)
+    {
+        var result = await attachmentService.GetHistoryByInstanceAsync(id, ct);
+        return FromResult(result);
+    }
+
     [HttpPost("{id:guid}/attachments")]
     [RequestSizeLimit(31_457_280)] // 30 MB
     public async Task<ActionResult<ApiResponse<ReportAttachmentResponse>>> AddFileAttachment(
@@ -185,6 +196,29 @@ public class ReportInstancesController(
                 break;
             }
         }
+    }
+
+    // ── Activity / Audit ─────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/activity")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceActivityResponse>>>> GetActivity(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        var result = await auditLogService.GetActivityAsync(id, ct);
+        return FromResult(result);
+    }
+
+    [HttpGet("{id:guid}/audit")]
+    [Authorize(Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.Auditor)}")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceAuditEntryResponse>>>> GetAudit(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        var result = await auditLogService.GetAuditAsync(id, ct);
+        return FromResult(result);
     }
 
     [HttpPost("{id:guid}/attachments/reversion")]

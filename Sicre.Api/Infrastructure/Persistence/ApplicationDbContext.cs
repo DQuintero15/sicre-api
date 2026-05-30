@@ -12,6 +12,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ReportInstance> ReportInstances => Set<ReportInstance>();
     public DbSet<ReportReversion> ReportReversions => Set<ReportReversion>();
     public DbSet<ReportAttachment> ReportAttachments => Set<ReportAttachment>();
+    public DbSet<ReportInstanceAuditEntry> ReportInstanceAuditEntries => Set<ReportInstanceAuditEntry>();
     public DbSet<ControlEntity> ControlEntities => Set<ControlEntity>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Process> Processes => Set<Process>();
