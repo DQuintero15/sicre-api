@@ -12,7 +12,7 @@ internal static class NotificationEmailTemplates
         string backendUrl
     )
     {
-        var instanceUrl = $"{frontendUrl.TrimEnd('/')}/report-instances/{instanceId}";
+        var instanceUrl = $"{frontendUrl.TrimEnd('/')}/reportes?instanceId={instanceId}";
 
         return EmailLayout.Wrap($$"""
             <h2 style="color:#111827;margin:0 0 20px;font-weight:600;font-size:18px;">{{title}}</h2>

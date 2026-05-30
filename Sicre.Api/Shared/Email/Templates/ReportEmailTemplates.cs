@@ -83,7 +83,7 @@ internal static class ReportEmailTemplates
             ? ""
             : $"<span style=\"color:#6b7280;font-size:13px;\"> | Sede: {branchName}</span>";
 
-        var instanceUrl = $"{frontendUrl}/report-instances/{instanceId}";
+        var instanceUrl = $"{frontendUrl.TrimEnd('/')}/reportes?instanceId={instanceId}";
         var pixelUrl = $"{backendUrl}/api/notifications/{notificationId}/mark-as-read";
 
         return EmailLayout.Wrap($$"""
