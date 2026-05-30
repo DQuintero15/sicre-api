@@ -7,5 +7,5 @@ public enum ReportSortBy
     PendingInstances,
     TotalInstances,
     LastSentDate,
-    CreatedAt
+    CreatedAt,
 }

@@ -116,20 +116,38 @@ public class ReportService(
                     (ReportSortBy.Name, true) => query.OrderByDescending(r => r.Name),
                     (ReportSortBy.CreatedAt, false) => query.OrderBy(r => r.CreatedAt),
                     (ReportSortBy.CreatedAt, true) => query.OrderByDescending(r => r.CreatedAt),
-                    (ReportSortBy.OverdueInstances, false) => query.OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue)),
-                    (ReportSortBy.OverdueInstances, true) => query.OrderByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue)),
-                    (ReportSortBy.PendingInstances, false) => query.OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Pending)),
-                    (ReportSortBy.PendingInstances, true) => query.OrderByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Pending)),
+                    (ReportSortBy.OverdueInstances, false) => query.OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue)
+                    ),
+                    (ReportSortBy.OverdueInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue)
+                    ),
+                    (ReportSortBy.PendingInstances, false) => query.OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Pending)
+                    ),
+                    (ReportSortBy.PendingInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Pending)
+                    ),
                     (ReportSortBy.TotalInstances, false) => query.OrderBy(r => r.Instances.Count),
-                    (ReportSortBy.TotalInstances, true) => query.OrderByDescending(r => r.Instances.Count),
-                    (ReportSortBy.LastSentDate, false) => query.OrderBy(r => r.Instances
-                        .Where(i => i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate)
-                        .Select(i => i.SentDate)
-                        .Max()),
-                    (ReportSortBy.LastSentDate, true) => query.OrderByDescending(r => r.Instances
-                        .Where(i => i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate)
-                        .Select(i => i.SentDate)
-                        .Max()),
+                    (ReportSortBy.TotalInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count
+                    ),
+                    (ReportSortBy.LastSentDate, false) => query.OrderBy(r =>
+                        r.Instances.Where(i =>
+                                i.Status == ReportStatus.SentOnTime
+                                || i.Status == ReportStatus.SentLate
+                            )
+                            .Select(i => i.SentDate)
+                            .Max()
+                    ),
+                    (ReportSortBy.LastSentDate, true) => query.OrderByDescending(r =>
+                        r.Instances.Where(i =>
+                                i.Status == ReportStatus.SentOnTime
+                                || i.Status == ReportStatus.SentLate
+                            )
+                            .Select(i => i.SentDate)
+                            .Max()
+                    ),
                     _ => query.OrderBy(r => r.Name),
                 };
             }
@@ -137,7 +155,9 @@ public class ReportService(
             {
                 // Default: overdue first, then pending count, then name
                 orderedQuery = query
-                    .OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue) > 0 ? 0 : 1)
+                    .OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue) > 0 ? 0 : 1
+                    )
                     .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue))
                     .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Pending))
                     .ThenBy(r => r.Name);

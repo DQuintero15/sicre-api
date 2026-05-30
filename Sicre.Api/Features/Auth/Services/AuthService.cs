@@ -27,7 +27,11 @@ public interface IAuthService
     Task<ApiResponse<RefreshTokenInternalDto>> RefreshTokenAsync(Guid userId, string refreshToken);
     Task<ApiResponse<bool>> GetTwoFactorEnabledAsync(Guid userId);
     Task<ApiResponse<LoginInternalResponseDto>> VerifyTwoFactorLoginAsync(Guid userId, string code);
-    Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordRequestDto dto, string? ipAddress, string? userAgent);
+    Task<ApiResponse<bool>> ForgotPasswordAsync(
+        ForgotPasswordRequestDto dto,
+        string? ipAddress,
+        string? userAgent
+    );
     Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordRequestDto dto);
 }
 
@@ -425,7 +429,11 @@ public class AuthService(
 
             var fullName = $"{user.FirstName} {user.LastName}";
             var emailBody = emailTemplateService.GetPasswordResetEmailTemplate(fullName, resetLink);
-            var emailSent = await emailService.SendEmailAsync(dto.Email, "Restablecer Contrasena - SICRE", emailBody);
+            var emailSent = await emailService.SendEmailAsync(
+                dto.Email,
+                "Restablecer Contrasena - SICRE",
+                emailBody
+            );
 
             if (emailSent)
             {
@@ -433,7 +441,10 @@ public class AuthService(
             }
             else
             {
-                logger.LogError("Fallo el envio del email de restablecimiento a {Email}", dto.Email);
+                logger.LogError(
+                    "Fallo el envio del email de restablecimiento a {Email}",
+                    dto.Email
+                );
             }
 
             return ApiResponse<bool>.Ok(true, neutral);
@@ -483,8 +494,10 @@ public class AuthService(
             }
 
             // Mark the reset request as used (anti-reuse)
-            var resetRequest = await db.PasswordResetRequests
-                .Where(r => r.Email == dto.Email.ToLower() && r.UsedAt == null)
+            var resetRequest = await db
+                .PasswordResetRequests.Where(r =>
+                    r.Email == dto.Email.ToLower() && r.UsedAt == null
+                )
                 .OrderByDescending(r => r.RequestedAt)
                 .FirstOrDefaultAsync();
             if (resetRequest is not null)
