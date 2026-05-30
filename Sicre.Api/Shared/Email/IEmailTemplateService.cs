@@ -32,4 +32,5 @@ public interface IEmailTemplateService
     );
     string GetReportsAssignedEmailTemplate(ReportsAssignedEmailDto data, Guid notificationId);
     string GetMonthlyStatusEmailTemplate(string userName, string monthName);
+    string GetInstanceEventEmailTemplate(string userName, string eventType, string title, string content, Guid instanceId);
 }

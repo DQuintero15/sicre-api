@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Services;
@@ -58,7 +59,8 @@ public class ReportInstanceService(
     ApplicationDbContext db,
     ILogger<ReportInstanceService> logger,
     IReportInstanceGenerator generator,
-    IAuditLogService auditLog
+    IAuditLogService auditLog,
+    INotificationAlertService alertService
 ) : IReportInstanceService
 {
     public async Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
@@ -375,6 +377,9 @@ public class ReportInstanceService(
             if (request.SupervisorUserId.HasValue)
                 await db.Entry(instance).Reference(ri => ri.SupervisorUser).LoadAsync(ct);
 
+            if (request.DueDate.HasValue)
+                await alertService.NotifyInstanceEventAsync(instance.Id, "DeadlineExtended", updatedByUserId, ct);
+
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
                 "Instancia de reporte actualizada exitosamente."
@@ -452,6 +457,8 @@ public class ReportInstanceService(
                 $"{reverterName} revirtió la instancia. Motivo: {request.Reason}",
                 new { previousStatus = previousStatus.ToString(), newStatus = newStatus.ToString(), reason = request.Reason }
             );
+
+            await alertService.NotifyInstanceEventAsync(instance.Id, "Reverted", revertedByUserId, ct);
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
@@ -550,6 +557,8 @@ public class ReportInstanceService(
                 $"{delivererName} marcó la instancia como enviada {statusLabel}.",
                 isLate ? new { delayReason = request.DelayReason } : null
             );
+
+            await alertService.NotifyInstanceEventAsync(instance.Id, "Delivered", userId, ct);
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),

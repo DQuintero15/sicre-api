@@ -180,6 +180,7 @@ builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobServi
 builder.Services.AddScoped<IReportImportService, ReportImportService>();
 builder.Services.AddScoped<IReportAttachmentService, ReportAttachmentService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IReportInstanceNoteService, ReportInstanceNoteService>();
 
 // Google Drive
 builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();
@@ -189,6 +190,7 @@ builder.Services.AddHostedService<DriveUploadWorker>();
 // Notification feature services
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
+builder.Services.AddScoped<INotificationAlertService, NotificationAlertService>();
 
 // Analytics feature
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();

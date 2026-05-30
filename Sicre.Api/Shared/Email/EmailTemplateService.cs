@@ -82,4 +82,20 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
 
     public string GetMonthlyStatusEmailTemplate(string userName, string monthName) =>
         NotificationEmailTemplates.MonthlyStatus(userName, monthName, _settings.FrontendUrl);
+
+    public string GetInstanceEventEmailTemplate(
+        string userName,
+        string eventType,
+        string title,
+        string content,
+        Guid instanceId
+    ) =>
+        NotificationEmailTemplates.InstanceEvent(
+            userName,
+            eventType,
+            title,
+            content,
+            instanceId,
+            _settings.FrontendUrl
+        );
 }

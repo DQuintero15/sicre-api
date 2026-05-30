@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.GoogleDrive.Services;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
@@ -47,7 +48,8 @@ public class ReportAttachmentService(
     IBackgroundQueueService backgroundQueue,
     IServiceScopeFactory scopeFactory,
     ILogger<ReportAttachmentService> logger,
-    IAuditLogService auditLog
+    IAuditLogService auditLog,
+    INotificationAlertService alertService
 ) : IReportAttachmentService
 {
     public async Task<ApiResponse<ReportAttachmentResponse>> AddFileAsync(
@@ -78,6 +80,7 @@ public class ReportAttachmentService(
                 $"{userName} subió el adjunto '{fileName}'.",
                 new { type = type.ToString(), fileName }
             );
+            await alertService.NotifyInstanceEventAsync(instanceId, "AttachmentUploaded", userId);
         }
 
         return result;
