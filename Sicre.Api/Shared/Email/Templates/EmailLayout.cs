@@ -2,25 +2,36 @@ namespace Sicre.Api.Shared.Email.Templates;
 
 internal static class EmailLayout
 {
-    private static string? _llanogasBase64;
-    private static string? _cusianagasBase64;
+    private static byte[]? _llanogasBytes;
+    private static byte[]? _cusianagasBytes;
     private static bool _initialized;
 
     internal static void Initialize(string contentRootPath)
     {
-        if (_initialized) return;
+        if (_initialized)
+            return;
         _initialized = true;
 
         try
         {
-            var llanogasPath = Path.Combine(contentRootPath, "Assets", "Images", "logo-llanogas.webp");
-            var cusianagasPath = Path.Combine(contentRootPath, "Assets", "Images", "logo-cusianagas.webp");
+            var llanogasPath = Path.Combine(
+                contentRootPath,
+                "Assets",
+                "Images",
+                "logo-llanogas.webp"
+            );
+            var cusianagasPath = Path.Combine(
+                contentRootPath,
+                "Assets",
+                "Images",
+                "logo-cusianagas.webp"
+            );
 
             if (File.Exists(llanogasPath))
-                _llanogasBase64 = Convert.ToBase64String(File.ReadAllBytes(llanogasPath));
+                _llanogasBytes = File.ReadAllBytes(llanogasPath);
 
             if (File.Exists(cusianagasPath))
-                _cusianagasBase64 = Convert.ToBase64String(File.ReadAllBytes(cusianagasPath));
+                _cusianagasBytes = File.ReadAllBytes(cusianagasPath);
         }
         catch
         {
@@ -28,26 +39,35 @@ internal static class EmailLayout
         }
     }
 
+    // Returns (contentId, bytes) pairs for MailKit LinkedResources
+    internal static IEnumerable<(string ContentId, byte[] Data)> GetInlineLogos()
+    {
+        if (_llanogasBytes != null)
+            yield return ("logo-llanogas", _llanogasBytes);
+        if (_cusianagasBytes != null)
+            yield return ("logo-cusianagas", _cusianagasBytes);
+    }
+
     internal static string Wrap(string bodyHtml)
     {
-        var hasLlanogas = !string.IsNullOrEmpty(_llanogasBase64);
-        var hasCusianagas = !string.IsNullOrEmpty(_cusianagasBase64);
+        var hasLlanogas = _llanogasBytes != null;
+        var hasCusianagas = _cusianagasBytes != null;
 
         string logosHtml;
 
         if (hasLlanogas && hasCusianagas)
         {
-            logosHtml = $"""
+            logosHtml = """
                 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;">
                   <tr>
                     <td align="center">
                       <table cellpadding="0" cellspacing="0">
                         <tr>
                           <td style="padding:0 8px 0 0;vertical-align:middle;">
-                            <img src="data:image/webp;base64,{_llanogasBase64}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
+                            <img src="cid:logo-llanogas" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
                           </td>
                           <td style="padding:0 0 0 8px;vertical-align:middle;">
-                            <img src="data:image/webp;base64,{_cusianagasBase64}" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;" />
+                            <img src="cid:logo-cusianagas" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;" />
                           </td>
                         </tr>
                       </table>
@@ -58,11 +78,11 @@ internal static class EmailLayout
         }
         else if (hasLlanogas)
         {
-            logosHtml = $"""
+            logosHtml = """
                 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;">
                   <tr>
                     <td align="center">
-                      <img src="data:image/webp;base64,{_llanogasBase64}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
+                      <img src="cid:logo-llanogas" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
                     </td>
                   </tr>
                 </table>

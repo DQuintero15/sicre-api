@@ -29,7 +29,8 @@ internal static class ReportEmailTemplates
             ? ""
             : $"<span style=\"color:#6b7280;font-size:13px;\"> | Sede: {branchName}</span>";
 
-        return EmailLayout.Wrap($$"""
+        return EmailLayout.Wrap(
+            $$"""
             <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
               <tr>
                 <td style="background-color:{{color}};padding:4px 12px;border-radius:4px;">
@@ -47,12 +48,15 @@ internal static class ReportEmailTemplates
                 <td style="padding:12px 16px;font-size:13px;color:#4b5563;"><strong>Fecha de vencimiento:</strong> {{dueDate:dd/MM/yyyy}}{{branchRow}}</td>
               </tr>
               <tr>
-                <td style="padding:0 16px 12px;font-size:13px;color:#4b5563;"><strong>{{(isOverdue ? "Dias de atraso" : "Dias restantes")}}:</strong> {{daysRemaining}}</td>
+                <td style="padding:0 16px 12px;font-size:13px;color:#4b5563;"><strong>{{(
+                isOverdue ? "Dias de atraso" : "Dias restantes"
+            )}}:</strong> {{daysRemaining}}</td>
               </tr>
             </table>
             <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Por favor asegurese de gestionar este reporte antes de la fecha limite.</p>
             <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:12px 40px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ir a la plataforma</a>
-            """);
+            """
+        );
     }
 
     internal static string ReportAlertNotification(
@@ -85,7 +89,8 @@ internal static class ReportEmailTemplates
         var instanceUrl = $"{frontendUrl.TrimEnd('/')}/reportes?instanceId={instanceId}";
         var pixelUrl = $"{backendUrl}/api/notifications/{notificationId}/mark-as-read";
 
-        return EmailLayout.Wrap($$"""
+        return EmailLayout.Wrap(
+            $$"""
             <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
               <tr>
                 <td style="background-color:{{color}};padding:4px 12px;border-radius:4px;">
@@ -111,7 +116,8 @@ internal static class ReportEmailTemplates
             </table>
             <a href="{{instanceUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ver reporte en SICRE</a>
             <img src="{{pixelUrl}}" width="1" height="1" alt="" style="display:none;" />
-            """);
+            """
+        );
     }
 
     internal static string ReportsAssigned(
@@ -147,7 +153,8 @@ internal static class ReportEmailTemplates
             ? ""
             : $"<p style=\"color:#374151;font-size:13px;margin:0 0 4px;\"><strong>Sede:</strong> {data.BranchName}</p>";
 
-        return EmailLayout.Wrap($$"""
+        return EmailLayout.Wrap(
+            $$"""
             <h2 style="color:#111827;margin:0 0 20px;font-weight:600;font-size:18px;">Reportes Asignados</h2>
             <p style="color:#4b5563;font-size:14px;margin:0 0 16px;line-height:1.6;">Hola <strong>{{data.UserName}}</strong>,</p>
             <p style="color:#4b5563;font-size:14px;margin:0 0 20px;line-height:1.6;">
@@ -176,7 +183,7 @@ internal static class ReportEmailTemplates
             <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">Para mas informacion, accede a la plataforma:</p>
             <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:10px 30px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Acceder a SICRE</a>
             <img src="{{backendUrl}}/api/notification/{{notificationId}}/mark-as-read" width="1" height="1" alt="" style="display:none;" />
-            """);
-}
-
+            """
+        );
+    }
 }

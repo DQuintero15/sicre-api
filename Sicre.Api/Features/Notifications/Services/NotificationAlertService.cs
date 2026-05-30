@@ -67,11 +67,25 @@ public class NotificationAlertService(
             // ─── Notify registered users ───────────────────────────────
             foreach (var user in recipients.Values)
             {
-                await NotifyUserAsync(user, title, content, severity, priority, instance, eventType, autoNotify, ct);
+                await NotifyUserAsync(
+                    user,
+                    title,
+                    content,
+                    severity,
+                    priority,
+                    instance,
+                    eventType,
+                    autoNotify,
+                    ct
+                );
             }
 
             // ─── Notify subscribers from NotificationEmails ────────────
-            var emailSubscribers = GetEmailSubscribers(instance, recipients.Keys, triggeredByUserId);
+            var emailSubscribers = GetEmailSubscribers(
+                instance,
+                recipients.Keys,
+                triggeredByUserId
+            );
             foreach (var email in emailSubscribers)
             {
                 if (!autoNotify)
@@ -197,8 +211,8 @@ public class NotificationAlertService(
                 );
                 if (emails is not null)
                 {
-                    var matchedUsers = db.Users
-                        .Where(u => emails.Contains(u.Email!) && u.Id != triggeredByUserId)
+                    var matchedUsers = db
+                        .Users.Where(u => emails.Contains(u.Email!) && u.Id != triggeredByUserId)
                         .ToList();
 
                     foreach (var user in matchedUsers)
@@ -210,7 +224,11 @@ public class NotificationAlertService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Error al parsear NotificationEmails del reporte {ReportId}", instance.Report?.Id);
+                logger.LogWarning(
+                    ex,
+                    "Error al parsear NotificationEmails del reporte {ReportId}",
+                    instance.Report?.Id
+                );
             }
         }
 
@@ -236,8 +254,8 @@ public class NotificationAlertService(
             if (emails is null)
                 return emailOnly;
 
-            var registeredEmails = db.Users
-                .Where(u => emails.Contains(u.Email!))
+            var registeredEmails = db
+                .Users.Where(u => emails.Contains(u.Email!))
                 .Select(u => u.Email!)
                 .ToHashSet();
 
@@ -255,7 +273,11 @@ public class NotificationAlertService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Error al procesar NotificationEmails del reporte {ReportId}", instance.Report?.Id);
+            logger.LogWarning(
+                ex,
+                "Error al procesar NotificationEmails del reporte {ReportId}",
+                instance.Report?.Id
+            );
         }
 
         return emailOnly;

@@ -3,7 +3,8 @@ namespace Sicre.Api.Shared.Email.Templates;
 public static class MonthlyReportEmailTemplate
 {
     public static string Build(string periodLabel, string dashboardUrl) =>
-        EmailLayout.Wrap($$"""
+        EmailLayout.Wrap(
+            $$"""
             <h2 style="color:#111827;margin:0 0 12px;font-weight:600;font-size:18px;">Informe Mensual de Cumplimiento</h2>
             <p style="color:#6b7280;font-size:12px;margin:0 0 20px;font-weight:500;">{{periodLabel}}</p>
             <p style="color:#4b5563;font-size:14px;margin:0 0 20px;line-height:1.6;">
@@ -26,5 +27,6 @@ public static class MonthlyReportEmailTemplate
             </table>
             <p style="color:#6b7280;font-size:13px;margin:0 0 24px;">Para un analisis interactivo con filtros adicionales, acceda al tablero de analitica en SICRE.</p>
             <a href="{{dashboardUrl}}/analytics" style="background:#1d3e81;color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:6px;text-decoration:none;display:inline-block;">Ir al tablero de analitica</a>
-            """);
+            """
+        );
 }
