@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Requests;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Services;
@@ -14,6 +15,8 @@ public interface IReportInstanceService
 {
     Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     );
 
@@ -55,17 +58,30 @@ public interface IReportInstanceService
 public class ReportInstanceService(
     ApplicationDbContext db,
     ILogger<ReportInstanceService> logger,
-    IReportInstanceGenerator generator
+    IReportInstanceGenerator generator,
+    IAuditLogService auditLog,
+    INotificationAlertService alertService
 ) : IReportInstanceService
 {
     public async Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     )
     {
         try
         {
-            var query = db.ReportInstances.Include(ri => ri.Report).AsQueryable();
+            var query = db
+                .ReportInstances.Include(ri => ri.Report)
+                    .ThenInclude(r => r!.SenderResponsibleUser)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.EntityUploadResponsibleUser)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.FollowUpLeaderUser)
+                .AsQueryable();
+
+            query = ApplyRoleFilter(query, callerUserId, callerRole);
 
             if (request.ReportId.HasValue)
                 query = query.Where(ri => ri.ReportId == request.ReportId.Value);
@@ -124,6 +140,8 @@ public class ReportInstanceService(
                 .ReportInstances.Include(ri => ri.Report)
                 .Include(ri => ri.ResponsibleUser)
                 .Include(ri => ri.SupervisorUser)
+                .Include(ri => ri.Reversions)
+                    .ThenInclude(r => r.CreatedByUser)
                 .FirstOrDefaultAsync(ri => ri.Id == id, ct);
 
             if (instance is null)
@@ -132,7 +150,30 @@ public class ReportInstanceService(
                     "Instancia de reporte no encontrada."
                 );
 
-            return ApiResponse<ReportInstanceResponse>.Ok(ToResponse(instance));
+            var attachmentsCount = await db.ReportAttachments.CountAsync(
+                a => a.ReportInstanceId == id && a.IsActive,
+                ct
+            );
+
+            var response = ToResponse(instance);
+            response.AttachmentsCount = attachmentsCount;
+            response.Reversions = instance
+                .Reversions.OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ReportReversionResponse
+                {
+                    Id = r.Id,
+                    PreviousStatus = r.PreviousStatus,
+                    NewStatus = r.NewStatus,
+                    Reason = r.Reason,
+                    CreatedByUserId = r.CreatedByUserId,
+                    CreatedByUserName = r.CreatedByUser is not null
+                        ? $"{r.CreatedByUser.FirstName} {r.CreatedByUser.LastName}"
+                        : null,
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToList();
+
+            return ApiResponse<ReportInstanceResponse>.Ok(response);
         }
         catch (Exception ex)
         {
@@ -338,6 +379,14 @@ public class ReportInstanceService(
             if (request.SupervisorUserId.HasValue)
                 await db.Entry(instance).Reference(ri => ri.SupervisorUser).LoadAsync(ct);
 
+            if (request.DueDate.HasValue)
+                await alertService.NotifyInstanceEventAsync(
+                    instance.Id,
+                    "DeadlineExtended",
+                    updatedByUserId,
+                    ct
+                );
+
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
                 "Instancia de reporte actualizada exitosamente."
@@ -406,6 +455,27 @@ public class ReportInstanceService(
 
             db.ReportReversions.Add(reversion);
             await db.SaveChangesAsync(ct);
+
+            var reverterName = await GetUserNameAsync(revertedByUserId);
+            await auditLog.RecordAsync(
+                "Reverted",
+                instance.Id,
+                revertedByUserId,
+                $"{reverterName} revirtió la instancia. Motivo: {request.Reason}",
+                new
+                {
+                    previousStatus = previousStatus.ToString(),
+                    newStatus = newStatus.ToString(),
+                    reason = request.Reason,
+                }
+            );
+
+            await alertService.NotifyInstanceEventAsync(
+                instance.Id,
+                "Reverted",
+                revertedByUserId,
+                ct
+            );
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
@@ -494,6 +564,18 @@ public class ReportInstanceService(
             instance.UpdatedByUserId = userId;
 
             await db.SaveChangesAsync(ct);
+
+            var delivererName = await GetUserNameAsync(userId);
+            var statusLabel = isLate ? "tarde" : "a tiempo";
+            await auditLog.RecordAsync(
+                "Delivered",
+                instance.Id,
+                userId,
+                $"{delivererName} marcó la instancia como enviada {statusLabel}.",
+                isLate ? new { delayReason = request.DelayReason } : null
+            );
+
+            await alertService.NotifyInstanceEventAsync(instance.Id, "Delivered", userId, ct);
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
@@ -585,6 +667,12 @@ public class ReportInstanceService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────────
+
+    private async Task<string> GetUserNameAsync(Guid userId)
+    {
+        var user = await db.Users.FindAsync(userId);
+        return user is not null ? $"{user.FirstName} {user.LastName}" : "Usuario";
+    }
 
     private static int? DerivePeriodMonth(ReportFrequency frequency, int month) =>
         frequency switch
@@ -717,4 +805,23 @@ public class ReportInstanceService(
             SentDate = ri.SentDate,
             CreatedAt = ri.CreatedAt,
         };
+
+    private static IQueryable<ReportInstance> ApplyRoleFilter(
+        IQueryable<ReportInstance> query,
+        Guid callerUserId,
+        string callerRole
+    )
+    {
+        if (callerRole == nameof(Role.Administrator) || callerRole == nameof(Role.Auditor))
+            return query;
+
+        if (callerRole == nameof(Role.ComplianceSupervisor))
+            return query.Where(ri => ri.Report!.FollowUpLeaderUserId == callerUserId);
+
+        // ReportResponsible: solo instancias de sus reportes asignados
+        return query.Where(ri =>
+            ri.Report!.SenderResponsibleUserId == callerUserId
+            || ri.Report!.EntityUploadResponsibleUserId == callerUserId
+        );
+    }
 }

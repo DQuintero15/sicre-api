@@ -19,5 +19,6 @@ public class ReportInstanceSummaryResponse
     public string? ResponsibleUserName { get; set; }
     public Guid SupervisorUserId { get; set; }
     public string? SupervisorUserName { get; set; }
+    public int AttachmentsCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }

@@ -17,6 +17,11 @@ public abstract class BaseController : ControllerBase
         return userId;
     }
 
+    protected string GetUserRole()
+    {
+        return User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? string.Empty;
+    }
+
     protected ActionResult<ApiResponse<T>> FromResult<T>(ApiResponse<T> result) =>
         result.StatusCode switch
         {

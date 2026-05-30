@@ -22,7 +22,7 @@ public class ReportsController(IReportService reportService) : BaseController
         CancellationToken ct
     )
     {
-        var result = await reportService.GetAllAsync(request, ct);
+        var result = await reportService.GetAllAsync(request, GetUserId(), GetUserRole(), ct);
         return FromResult(result);
     }
 
@@ -37,6 +37,7 @@ public class ReportsController(IReportService reportService) : BaseController
     }
 
     [HttpPost]
+    [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
     public async Task<ActionResult<ApiResponse<ReportResponse>>> Create(
         [FromBody] CreateReportRequest request,
         CancellationToken ct
@@ -50,6 +51,7 @@ public class ReportsController(IReportService reportService) : BaseController
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
     public async Task<ActionResult<ApiResponse<ReportResponse>>> Update(
         Guid id,
         [FromBody] UpdateReportRequest request,
@@ -62,6 +64,7 @@ public class ReportsController(IReportService reportService) : BaseController
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
     public async Task<ActionResult<ApiResponse<bool>>> Deactivate(Guid id, CancellationToken ct)
     {
         var userId = GetUserId();
@@ -71,6 +74,7 @@ public class ReportsController(IReportService reportService) : BaseController
 
     /// <summary>Importa reportes desde un archivo .json (multipart/form-data, campo "file").</summary>
     [HttpPost("import")]
+    [Authorize(Roles = nameof(Domain.Enums.Role.Administrator))]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult> ImportFromFile(
         [FromServices] IReportImportService importService,

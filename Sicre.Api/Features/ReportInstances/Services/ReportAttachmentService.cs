@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.GoogleDrive.Services;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
@@ -34,6 +35,11 @@ public interface IReportAttachmentService
         CancellationToken ct = default
     );
 
+    Task<ApiResponse<PagedResult<ReportAttachmentResponse>>> GetHistoryByInstanceAsync(
+        Guid instanceId,
+        CancellationToken ct = default
+    );
+
     Task<UploadProgress?> GetProgressAsync(Guid attachmentId);
 }
 
@@ -41,7 +47,9 @@ public class ReportAttachmentService(
     ApplicationDbContext db,
     IBackgroundQueueService backgroundQueue,
     IServiceScopeFactory scopeFactory,
-    ILogger<ReportAttachmentService> logger
+    ILogger<ReportAttachmentService> logger,
+    IAuditLogService auditLog,
+    INotificationAlertService alertService
 ) : IReportAttachmentService
 {
     public async Task<ApiResponse<ReportAttachmentResponse>> AddFileAsync(
@@ -59,7 +67,30 @@ public class ReportAttachmentService(
                 "Para este tipo de soporte, usa la opción de registrar reversión."
             );
 
-        return await AddFileCoreAsync(instanceId, type, fileStream, fileName, contentType, userId);
+        var result = await AddFileCoreAsync(
+            instanceId,
+            type,
+            fileStream,
+            fileName,
+            contentType,
+            userId
+        );
+
+        if (result.Success)
+        {
+            var user = await db.Users.FindAsync(userId);
+            var userName = user is not null ? $"{user.FirstName} {user.LastName}" : "Usuario";
+            await auditLog.RecordAsync(
+                "AttachmentUploaded",
+                instanceId,
+                userId,
+                $"{userName} subió el adjunto '{fileName}'.",
+                new { type = type.ToString(), fileName }
+            );
+            await alertService.NotifyInstanceEventAsync(instanceId, "AttachmentUploaded", userId);
+        }
+
+        return result;
     }
 
     public async Task<ApiResponse<ReportAttachmentResponse>> AddReversionFileAsync(
@@ -339,6 +370,74 @@ public class ReportAttachmentService(
             return ApiResponse<PagedResult<ReportAttachmentResponse>>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error al obtener los adjuntos."
+            );
+        }
+    }
+
+    public async Task<ApiResponse<PagedResult<ReportAttachmentResponse>>> GetHistoryByInstanceAsync(
+        Guid instanceId,
+        CancellationToken ct = default
+    )
+    {
+        try
+        {
+            var instance = await db.ReportInstances.FirstOrDefaultAsync(
+                i => i.Id == instanceId,
+                ct
+            );
+            if (instance is null)
+                return ApiResponse<PagedResult<ReportAttachmentResponse>>.Fail(
+                    HttpStatusCode.NotFound,
+                    "Instancia no encontrada."
+                );
+
+            var items = await db
+                .ReportAttachments.Include(a => a.UploadedByUser)
+                .Where(a => a.ReportInstanceId == instanceId)
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => new ReportAttachmentResponse
+                {
+                    Id = a.Id,
+                    ReportInstanceId = a.ReportInstanceId,
+                    Type = a.Type,
+                    FileName = a.FileName,
+                    MimeType = a.MimeType,
+                    GoogleFileId = a.GoogleFileId,
+                    WebViewLink = a.WebViewLink,
+                    WebContentLink = a.WebContentLink,
+                    Url = a.Url,
+                    FileSize = a.FileSize,
+                    UploadProgress = a.UploadProgress,
+                    UploadedByUserId = a.UploadedByUserId,
+                    UploadedByUserName =
+                        a.UploadedByUser != null
+                            ? $"{a.UploadedByUser.FirstName} {a.UploadedByUser.LastName}"
+                            : null,
+                    IsActive = a.IsActive,
+                    CreatedAt = a.CreatedAt,
+                })
+                .ToListAsync(ct);
+
+            return ApiResponse<PagedResult<ReportAttachmentResponse>>.Ok(
+                new PagedResult<ReportAttachmentResponse>
+                {
+                    Items = items,
+                    TotalItems = items.Count,
+                    Page = 1,
+                    PageSize = items.Count,
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error al obtener historial de adjuntos de instancia {InstanceId}.",
+                instanceId
+            );
+            return ApiResponse<PagedResult<ReportAttachmentResponse>>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error al obtener el historial de adjuntos."
             );
         }
     }

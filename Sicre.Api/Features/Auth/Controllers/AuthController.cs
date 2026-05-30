@@ -202,7 +202,8 @@ public class AuthController(
     )
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await authService.ForgotPasswordAsync(request, ip);
+        var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
+        var result = await authService.ForgotPasswordAsync(request, ip, userAgent);
         return FromResult(result);
     }
 

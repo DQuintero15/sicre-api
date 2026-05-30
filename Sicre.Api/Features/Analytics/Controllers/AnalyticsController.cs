@@ -13,7 +13,10 @@ namespace Sicre.Api.Features.Analytics.Controllers;
 [Route("api/analytics")]
 [Authorize]
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
-public class AnalyticsController(IAnalyticsService analyticsService) : BaseController
+public class AnalyticsController(
+    IAnalyticsService analyticsService,
+    IAnalyticsExportService analyticsExportService
+) : BaseController
 {
     [HttpGet("state-distribution")]
     public async Task<ActionResult<ApiResponse<StateDistributionDto>>> GetStateDistribution(
@@ -95,6 +98,28 @@ public class AnalyticsController(IAnalyticsService analyticsService) : BaseContr
             year
         );
         return FromResult(result);
+    }
+
+    [HttpGet("compliance-by-branch")]
+    public async Task<ActionResult<ApiResponse<List<BranchComplianceDto>>>> GetComplianceByBranch(
+        [FromQuery] AnalyticsFilterRequest filter
+    )
+    {
+        var result = await analyticsService.GetComplianceByBranchAsync(
+            GetUserId(),
+            GetUserRoles(),
+            filter
+        );
+        return FromResult(result);
+    }
+
+    [HttpGet("export-pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportPdf([FromQuery] AnalyticsFilterRequest filter)
+    {
+        var result = await analyticsExportService.ExportAsync(filter, GetUserId(), GetUserRoles());
+
+        return File(result.Content, "application/pdf", result.FileName);
     }
 
     private List<string> GetUserRoles() =>

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
+using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Features.Reports.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
@@ -14,6 +15,8 @@ public interface IReportService
 {
     Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
         GetReportsRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     );
 
@@ -48,6 +51,8 @@ public class ReportService(
 {
     public async Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
         GetReportsRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     )
     {
@@ -61,7 +66,11 @@ public class ReportService(
                     .ThenInclude(i => i.ResponsibleUser)
                 .Include(r => r.Instances)
                     .ThenInclude(i => i.SupervisorUser)
+                .Include(r => r.Instances)
+                    .ThenInclude(i => i.Attachments)
                 .AsQueryable();
+
+            query = ApplyRoleFilter(query, callerUserId, callerRole);
 
             if (request.ControlEntityId.HasValue)
                 query = query.Where(r => r.ControlEntityId == request.ControlEntityId.Value);
@@ -93,8 +102,68 @@ public class ReportService(
             }
 
             var total = await query.CountAsync(ct);
-            var items = await query
-                .OrderBy(r => r.Name)
+
+            // ── Smart default ordering ────────────────────────────────
+            // Priority: overdue instances > pending count > name
+            IOrderedQueryable<Report> orderedQuery;
+
+            if (request.SortBy.HasValue)
+            {
+                var descending = request.SortDescending ?? false;
+                orderedQuery = (request.SortBy.Value, descending) switch
+                {
+                    (ReportSortBy.Name, false) => query.OrderBy(r => r.Name),
+                    (ReportSortBy.Name, true) => query.OrderByDescending(r => r.Name),
+                    (ReportSortBy.CreatedAt, false) => query.OrderBy(r => r.CreatedAt),
+                    (ReportSortBy.CreatedAt, true) => query.OrderByDescending(r => r.CreatedAt),
+                    (ReportSortBy.OverdueInstances, false) => query.OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue)
+                    ),
+                    (ReportSortBy.OverdueInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue)
+                    ),
+                    (ReportSortBy.PendingInstances, false) => query.OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Pending)
+                    ),
+                    (ReportSortBy.PendingInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Pending)
+                    ),
+                    (ReportSortBy.TotalInstances, false) => query.OrderBy(r => r.Instances.Count),
+                    (ReportSortBy.TotalInstances, true) => query.OrderByDescending(r =>
+                        r.Instances.Count
+                    ),
+                    (ReportSortBy.LastSentDate, false) => query.OrderBy(r =>
+                        r.Instances.Where(i =>
+                                i.Status == ReportStatus.SentOnTime
+                                || i.Status == ReportStatus.SentLate
+                            )
+                            .Select(i => i.SentDate)
+                            .Max()
+                    ),
+                    (ReportSortBy.LastSentDate, true) => query.OrderByDescending(r =>
+                        r.Instances.Where(i =>
+                                i.Status == ReportStatus.SentOnTime
+                                || i.Status == ReportStatus.SentLate
+                            )
+                            .Select(i => i.SentDate)
+                            .Max()
+                    ),
+                    _ => query.OrderBy(r => r.Name),
+                };
+            }
+            else
+            {
+                // Default: overdue first, then pending count, then name
+                orderedQuery = query
+                    .OrderBy(r =>
+                        r.Instances.Count(i => i.Status == ReportStatus.Overdue) > 0 ? 0 : 1
+                    )
+                    .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue))
+                    .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Pending))
+                    .ThenBy(r => r.Name);
+            }
+
+            var items = await orderedQuery
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync(ct);
@@ -274,18 +343,6 @@ public class ReportService(
                 report.Name = request.Name;
             if (request.LegalBasis != null)
                 report.LegalBasis = request.LegalBasis;
-            if (request.Frequency.HasValue)
-                report.Frequency = request.Frequency.Value;
-            if (request.GenerationMode.HasValue)
-                report.GenerationMode = request.GenerationMode.Value;
-            if (request.DueDateRuleType.HasValue)
-                report.DueDateRuleType = request.DueDateRuleType.Value;
-            if (request.DueDateDay.HasValue)
-                report.DueDateDay = request.DueDateDay;
-            if (request.DueDateMonth.HasValue)
-                report.DueDateMonth = request.DueDateMonth;
-            if (request.DueDateDatesDefinition != null)
-                report.DueDateDatesDefinition = request.DueDateDatesDefinition;
             if (request.OriginalDueDateText != null)
                 report.OriginalDueDateText = request.OriginalDueDateText;
             if (request.AlertEarlyDays.HasValue)
@@ -302,10 +359,16 @@ public class ReportService(
                 report.TemplateFileUrl = request.TemplateFileUrl;
             if (request.NotificationEmails != null)
                 report.NotificationEmails = request.NotificationEmails;
-            if (request.StartDate.HasValue)
-                report.StartDate = request.StartDate.Value;
-            if (request.EndDate.HasValue)
-                report.EndDate = request.EndDate;
+
+            bool entityUploadResponsibleChanged =
+                request.EntityUploadResponsibleUserId.HasValue
+                && request.EntityUploadResponsibleUserId.Value
+                    != report.EntityUploadResponsibleUserId;
+
+            bool followUpLeaderChanged =
+                request.FollowUpLeaderUserId.HasValue
+                && request.FollowUpLeaderUserId.Value != report.FollowUpLeaderUserId;
+
             if (request.SenderResponsibleUserId.HasValue)
                 report.SenderResponsibleUserId = request.SenderResponsibleUserId.Value;
             if (request.EntityUploadResponsibleUserId.HasValue)
@@ -315,6 +378,16 @@ public class ReportService(
 
             report.UpdatedAt = DateTime.UtcNow;
             report.UpdatedByUserId = updatedByUserId;
+
+            if (entityUploadResponsibleChanged || followUpLeaderChanged)
+                await PropagatePendingInstanceResponsiblesAsync(
+                    id,
+                    entityUploadResponsibleChanged
+                        ? request.EntityUploadResponsibleUserId!.Value
+                        : null,
+                    followUpLeaderChanged ? request.FollowUpLeaderUserId!.Value : null,
+                    ct
+                );
 
             await db.SaveChangesAsync(ct);
 
@@ -330,6 +403,26 @@ public class ReportService(
                 HttpStatusCode.InternalServerError,
                 "Error al actualizar el reporte."
             );
+        }
+    }
+
+    private async Task PropagatePendingInstanceResponsiblesAsync(
+        Guid reportId,
+        Guid? newResponsibleUserId,
+        Guid? newSupervisorUserId,
+        CancellationToken ct
+    )
+    {
+        var pendingInstances = await db
+            .ReportInstances.Where(i => i.ReportId == reportId && i.Status == ReportStatus.Pending)
+            .ToListAsync(ct);
+
+        foreach (var instance in pendingInstances)
+        {
+            if (newResponsibleUserId.HasValue)
+                instance.ResponsibleUserId = newResponsibleUserId.Value;
+            if (newSupervisorUserId.HasValue)
+                instance.SupervisorUserId = newSupervisorUserId.Value;
         }
     }
 
@@ -362,6 +455,28 @@ public class ReportService(
                 "Error al desactivar el reporte."
             );
         }
+    }
+
+    private static IQueryable<Report> ApplyRoleFilter(
+        IQueryable<Report> query,
+        Guid callerUserId,
+        string callerRole
+    )
+    {
+        if (
+            callerRole == nameof(Domain.Enums.Role.Administrator)
+            || callerRole == nameof(Domain.Enums.Role.Auditor)
+        )
+            return query;
+
+        if (callerRole == nameof(Domain.Enums.Role.ComplianceSupervisor))
+            return query.Where(r => r.FollowUpLeaderUserId == callerUserId);
+
+        // ReportResponsible: solo sus reportes asignados
+        return query.Where(r =>
+            r.SenderResponsibleUserId == callerUserId
+            || r.EntityUploadResponsibleUserId == callerUserId
+        );
     }
 
     private async Task GenerateInitialProjectionAsync(
@@ -493,6 +608,13 @@ public class ReportService(
             CompletedInstances = instances.Count(i =>
                 i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
             ),
+            LastSentDate = instances
+                .Where(i =>
+                    i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
+                )
+                .Select(i => i.SentDate)
+                .OrderByDescending(d => d)
+                .FirstOrDefault(),
             Instances = instances
                 .Select(i => new ReportInstanceSummaryResponse
                 {
@@ -515,6 +637,7 @@ public class ReportService(
                         i.SupervisorUser != null
                             ? $"{i.SupervisorUser.FirstName} {i.SupervisorUser.LastName}"
                             : null,
+                    AttachmentsCount = i.Attachments?.Count(a => a.IsActive) ?? 0,
                     CreatedAt = i.CreatedAt,
                 })
                 .ToList(),

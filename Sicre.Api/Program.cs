@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using QuestPDF.Infrastructure;
 using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
@@ -37,6 +38,9 @@ using Sicre.Api.Infrastructure.Persistence.Seeders;
 using Sicre.Api.Infrastructure.Workers;
 using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
+using Sicre.Api.Shared.Reports;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -179,6 +183,8 @@ builder.Services.AddScoped<IReportInstanceService, ReportInstanceService>();
 builder.Services.AddScoped<IReportGenerationJobService, ReportGenerationJobService>();
 builder.Services.AddScoped<IReportImportService, ReportImportService>();
 builder.Services.AddScoped<IReportAttachmentService, ReportAttachmentService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IReportInstanceNoteService, ReportInstanceNoteService>();
 
 // Google Drive
 builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();
@@ -188,9 +194,11 @@ builder.Services.AddHostedService<DriveUploadWorker>();
 // Notification feature services
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
+builder.Services.AddScoped<INotificationAlertService, NotificationAlertService>();
 
 // Analytics feature
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IAnalyticsExportService, AnalyticsExportService>();
 
 // SICRE Settings
 builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
@@ -198,6 +206,8 @@ builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
 builder.Services.AddScoped<INotificationJobService, NotificationJobService>();
+builder.Services.AddScoped<IMonthlyReportJobService, MonthlyReportJobService>();
+builder.Services.AddScoped<MonthlyReportPdfGenerator>();
 
 // Seeders con dependencias
 builder.Services.AddScoped<AdminSeeder>();
@@ -218,6 +228,9 @@ builder
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Initialize email layout with logo images (inline base64)
+Sicre.Api.Shared.Email.Templates.EmailLayout.Initialize(app.Environment.ContentRootPath);
 
 // Migrate and seed
 using (var scope = app.Services.CreateScope())
@@ -272,14 +285,21 @@ RecurringJob.AddOrUpdate<IMaintenanceJobService>(
 RecurringJob.AddOrUpdate<IReportGenerationJobService>(
     "report-generation",
     job => job.RunAsync(),
-    "0 11 * * *",
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
+    "0 7 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
 );
 
 RecurringJob.AddOrUpdate<INotificationJobService>(
     "daily-notifications",
     job => job.RunDailyNotificationsAsync(),
     "0 8 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
+);
+
+RecurringJob.AddOrUpdate<IMonthlyReportJobService>(
+    "monthly-report",
+    job => job.RunAsync(),
+    "0 8 1 * *",
     new RecurringJobOptions { TimeZone = colombiaZone }
 );
 

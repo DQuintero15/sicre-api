@@ -60,6 +60,11 @@ public class AnalyticsService(
         if (filter.ResponsibleUserId.HasValue)
             query = query.Where(i => i.ResponsibleUserId == filter.ResponsibleUserId.Value);
 
+        if (filter.BranchId.HasValue)
+            query = query.Where(i =>
+                i.Report != null && i.Report.BranchId == filter.BranchId.Value
+            );
+
         return query;
     }
 
@@ -259,7 +264,6 @@ public class AnalyticsService(
         try
         {
             var query = BuildBaseQuery(userId, userRoles);
-            query = query.Include(i => i.ResponsibleUser);
             query = ApplyFilters(query, filter);
 
             var flatData = await query
@@ -413,4 +417,155 @@ public class AnalyticsService(
             );
         }
     }
+
+    public async Task<ApiResponse<List<BranchComplianceDto>>> GetComplianceByBranchAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    )
+    {
+        try
+        {
+            var query = BuildBaseQuery(userId, userRoles);
+            query = query.Include(i => i.Report).ThenInclude(r => r!.Branch);
+            query = ApplyFilters(query, filter);
+
+            var flatData = await query
+                .Select(i => new
+                {
+                    BranchName = i.Report != null && i.Report.Branch != null
+                        ? i.Report.Branch.Name
+                        : "Sin Sede",
+                    i.Status,
+                })
+                .ToListAsync();
+
+            var grouped = flatData
+                .GroupBy(x => x.BranchName)
+                .Select(g =>
+                {
+                    var total = g.Count();
+                    var onTime = g.Count(x => x.Status == ReportStatus.SentOnTime);
+                    var late = g.Count(x => x.Status == ReportStatus.SentLate);
+                    var overdue = g.Count(x => x.Status == ReportStatus.Overdue);
+                    var pend = g.Count(x => x.Status == ReportStatus.Pending);
+
+                    return new BranchComplianceDto(
+                        BranchName: g.Key,
+                        Total: total,
+                        OnTime: onTime,
+                        Late: late,
+                        Overdue: overdue,
+                        Pending: pend,
+                        OnTimeRate: total > 0 ? Math.Round((double)onTime / total * 100, 2) : 0,
+                        DeliveryRate: total > 0
+                            ? Math.Round((double)(onTime + late) / total * 100, 2)
+                            : 0
+                    );
+                })
+                .OrderByDescending(x => x.OnTimeRate)
+                .ToList();
+
+            return ApiResponse<List<BranchComplianceDto>>.Ok(grouped);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting compliance by branch");
+            return ApiResponse<List<BranchComplianceDto>>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error obteniendo cumplimiento por sede"
+            );
+        }
+    }
+
+    public async Task<ApiResponse<List<ReversionSummaryDto>>> GetReversionsByPeriodAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    )
+    {
+        try
+        {
+            var isElevated = userRoles
+                .Intersect(ElevatedRoles, StringComparer.OrdinalIgnoreCase)
+                .Any();
+
+            var query = context
+                .ReportReversions.AsNoTracking()
+                .Include(r => r.ReportInstance)
+                    .ThenInclude(i => i!.Report)
+                .Include(r => r.CreatedByUser)
+                .AsQueryable();
+
+            if (!isElevated)
+                query = query.Where(r =>
+                    r.ReportInstance != null
+                    && (
+                        r.ReportInstance.ResponsibleUserId == userId
+                        || r.ReportInstance.SupervisorUserId == userId
+                        || (
+                            r.ReportInstance.Report != null
+                            && (
+                                r.ReportInstance.Report.SenderResponsibleUserId == userId
+                                || r.ReportInstance.Report.EntityUploadResponsibleUserId == userId
+                                || r.ReportInstance.Report.FollowUpLeaderUserId == userId
+                            )
+                        )
+                    )
+                );
+
+            if (filter.StartDate.HasValue)
+                query = query.Where(r =>
+                    r.CreatedAt >= filter.StartDate.Value.ToDateTime(TimeOnly.MinValue)
+                );
+
+            if (filter.EndDate.HasValue)
+                query = query.Where(r =>
+                    r.CreatedAt < filter.EndDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue)
+                );
+
+            var result = await query
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => new ReversionSummaryDto
+                {
+                    ReportName =
+                        r.ReportInstance != null && r.ReportInstance.Report != null
+                            ? r.ReportInstance.Report.Name
+                            : "—",
+                    ReportCode =
+                        r.ReportInstance != null && r.ReportInstance.Report != null
+                            ? r.ReportInstance.Report.Code
+                            : "—",
+                    PreviousStatus = StatusLabel(r.PreviousStatus),
+                    NewStatus = StatusLabel(r.NewStatus),
+                    Reason = r.Reason,
+                    CreatedByUserName =
+                        r.CreatedByUser != null
+                            ? r.CreatedByUser.FirstName + " " + r.CreatedByUser.LastName
+                            : "—",
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToListAsync();
+
+            return ApiResponse<List<ReversionSummaryDto>>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting reversions by period");
+            return ApiResponse<List<ReversionSummaryDto>>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error obteniendo reversiones del período"
+            );
+        }
+    }
+
+    private static string StatusLabel(Domain.Enums.ReportStatus status) =>
+        status switch
+        {
+            Domain.Enums.ReportStatus.Pending => "Pendiente",
+            Domain.Enums.ReportStatus.SentOnTime => "A Tiempo",
+            Domain.Enums.ReportStatus.SentLate => "Tarde",
+            Domain.Enums.ReportStatus.Overdue => "No Reportado",
+            _ => status.ToString(),
+        };
 }

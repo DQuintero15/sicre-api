@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Web;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ using Sicre.Api.Features.TwoFactor.Dtos;
 using Sicre.Api.Features.TwoFactor.Services;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
+using Sicre.Api.Shared.Email;
 
 namespace Sicre.Api.Features.Auth.Services;
 
@@ -24,7 +27,11 @@ public interface IAuthService
     Task<ApiResponse<RefreshTokenInternalDto>> RefreshTokenAsync(Guid userId, string refreshToken);
     Task<ApiResponse<bool>> GetTwoFactorEnabledAsync(Guid userId);
     Task<ApiResponse<LoginInternalResponseDto>> VerifyTwoFactorLoginAsync(Guid userId, string code);
-    Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordRequestDto dto, string? ipAddress);
+    Task<ApiResponse<bool>> ForgotPasswordAsync(
+        ForgotPasswordRequestDto dto,
+        string? ipAddress,
+        string? userAgent
+    );
     Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordRequestDto dto);
 }
 
@@ -36,7 +43,9 @@ public class AuthService(
     SignInManager<User> signInManager,
     IRefreshTokenService refreshTokenService,
     ITwoFactorService twoFactorService,
-    ApplicationDbContext db
+    ApplicationDbContext db,
+    IEmailService emailService,
+    IEmailTemplateService emailTemplateService
 ) : IAuthService
 {
     private readonly AppSettings _settings = options.Value;
@@ -366,7 +375,8 @@ public class AuthService(
 
     public async Task<ApiResponse<bool>> ForgotPasswordAsync(
         ForgotPasswordRequestDto dto,
-        string? ipAddress
+        string? ipAddress,
+        string? userAgent
     )
     {
         try
@@ -382,37 +392,60 @@ public class AuthService(
                     "Ha excedido el límite de solicitudes. Intente nuevamente en una hora."
                 );
 
+            const string neutral =
+                "Si el correo existe, recibirá un enlace para restablecer su contraseña.";
+            var user = await userManager.FindByEmailAsync(dto.Email);
+
+            // Always log the request (for audit), regardless of user existence
+            var token = user is not null
+                ? await userManager.GeneratePasswordResetTokenAsync(user)
+                : null;
+
+            var tokenHash = token is not null
+                ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
+                : null;
+
             db.PasswordResetRequests.Add(
                 new PasswordResetRequest
                 {
                     Id = Guid.NewGuid(),
                     Email = dto.Email.ToLower(),
-                    TokenHash = string.Empty,
+                    TokenHash = tokenHash ?? string.Empty,
                     RequestedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.AddHours(1),
                     IpAddress = ipAddress,
+                    UserAgent = userAgent,
                 }
             );
             await db.SaveChangesAsync();
 
-            const string neutral =
-                "Si el correo existe, recibirá un enlace para restablecer su contraseña.";
-            var user = await userManager.FindByEmailAsync(dto.Email);
-
             if (user == null || !user.IsActive)
                 return ApiResponse<bool>.Ok(true, neutral);
 
-            var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var encodedToken = HttpUtility.UrlEncode(token);
+            var encodedToken = HttpUtility.UrlEncode(token!);
             var encodedEmail = HttpUtility.UrlEncode(dto.Email);
             var resetLink =
                 $"{_settings.FrontendUrl}/auth/reset-password?token={encodedToken}&email={encodedEmail}";
 
-            logger.LogInformation(
-                "Enlace de restablecimiento generado para {Email}: {Link}",
+            var fullName = $"{user.FirstName} {user.LastName}";
+            var emailBody = emailTemplateService.GetPasswordResetEmailTemplate(fullName, resetLink);
+            var emailSent = await emailService.SendEmailAsync(
                 dto.Email,
-                resetLink
+                "Restablecer Contrasena - SICRE",
+                emailBody
             );
+
+            if (emailSent)
+            {
+                logger.LogInformation("Enlace de restablecimiento enviado a {Email}", dto.Email);
+            }
+            else
+            {
+                logger.LogError(
+                    "Fallo el envio del email de restablecimiento a {Email}",
+                    dto.Email
+                );
+            }
 
             return ApiResponse<bool>.Ok(true, neutral);
         }
@@ -458,6 +491,19 @@ public class AuthService(
             {
                 user.HasChangedDefaultPassword = true;
                 await userManager.UpdateAsync(user);
+            }
+
+            // Mark the reset request as used (anti-reuse)
+            var resetRequest = await db
+                .PasswordResetRequests.Where(r =>
+                    r.Email == dto.Email.ToLower() && r.UsedAt == null
+                )
+                .OrderByDescending(r => r.RequestedAt)
+                .FirstOrDefaultAsync();
+            if (resetRequest is not null)
+            {
+                resetRequest.UsedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
             }
 
             return ApiResponse<bool>.Ok(

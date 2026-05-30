@@ -3,6 +3,7 @@ using Sicre.Api.Config;
 using Sicre.Api.Features.Auth.Dtos;
 using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Shared.Email.Templates;
+using MonthlyReportTpl = Sicre.Api.Shared.Email.Templates.MonthlyReportEmailTemplate;
 
 namespace Sicre.Api.Shared.Email;
 
@@ -82,4 +83,23 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
 
     public string GetMonthlyStatusEmailTemplate(string userName, string monthName) =>
         NotificationEmailTemplates.MonthlyStatus(userName, monthName, _settings.FrontendUrl);
+
+    public string GetInstanceEventEmailTemplate(
+        string userName,
+        string eventType,
+        string title,
+        string content,
+        Guid instanceId
+    ) =>
+        NotificationEmailTemplates.InstanceEvent(
+            userName,
+            eventType,
+            title,
+            content,
+            instanceId,
+            _settings.FrontendUrl
+        );
+
+    public string GetMonthlyReportEmailTemplate(string periodLabel) =>
+        MonthlyReportTpl.Build(periodLabel, _settings.FrontendUrl);
 }

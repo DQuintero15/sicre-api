@@ -27,4 +27,6 @@ public class ReportInstanceResponse
     public string? SupervisorUserName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public int AttachmentsCount { get; set; }
+    public List<ReportReversionResponse> Reversions { get; set; } = [];
 }
