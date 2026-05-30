@@ -425,12 +425,16 @@ public class AuthService(
 
             var fullName = $"{user.FirstName} {user.LastName}";
             var emailBody = emailTemplateService.GetPasswordResetEmailTemplate(fullName, resetLink);
-            await emailService.SendEmailAsync(dto.Email, "Restablecer Contrasena - SICRE", emailBody);
+            var emailSent = await emailService.SendEmailAsync(dto.Email, "Restablecer Contrasena - SICRE", emailBody);
 
-            logger.LogInformation(
-                "Enlace de restablecimiento enviado a {Email}",
-                dto.Email
-            );
+            if (emailSent)
+            {
+                logger.LogInformation("Enlace de restablecimiento enviado a {Email}", dto.Email);
+            }
+            else
+            {
+                logger.LogError("Fallo el envio del email de restablecimiento a {Email}", dto.Email);
+            }
 
             return ApiResponse<bool>.Ok(true, neutral);
         }
