@@ -3,6 +3,7 @@ using Sicre.Api.Config;
 using Sicre.Api.Features.Auth.Dtos;
 using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Shared.Email.Templates;
+using MonthlyReportTpl = Sicre.Api.Shared.Email.Templates.MonthlyReportEmailTemplate;
 
 namespace Sicre.Api.Shared.Email;
 
@@ -98,4 +99,7 @@ public class EmailTemplateService(IOptions<AppSettings> options) : IEmailTemplat
             instanceId,
             _settings.FrontendUrl
         );
+
+    public string GetMonthlyReportEmailTemplate(string periodLabel) =>
+        MonthlyReportTpl.Build(periodLabel, _settings.FrontendUrl);
 }

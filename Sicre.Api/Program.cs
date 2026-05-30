@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Serialization;
+using QuestPDF.Infrastructure;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
@@ -33,10 +34,13 @@ using Sicre.Api.Infrastructure.Hangfire;
 using Sicre.Api.Infrastructure.Jobs;
 using Sicre.Api.Infrastructure.Middleware;
 using Sicre.Api.Infrastructure.Persistence;
+using Sicre.Api.Shared.Reports;
 using Sicre.Api.Infrastructure.Persistence.Seeders;
 using Sicre.Api.Infrastructure.Workers;
 using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -201,6 +205,8 @@ builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
 // Job services
 builder.Services.AddScoped<IMaintenanceJobService, MaintenanceJobService>();
 builder.Services.AddScoped<INotificationJobService, NotificationJobService>();
+builder.Services.AddScoped<IMonthlyReportJobService, MonthlyReportJobService>();
+builder.Services.AddScoped<MonthlyReportPdfGenerator>();
 
 // Seeders con dependencias
 builder.Services.AddScoped<AdminSeeder>();
@@ -283,6 +289,13 @@ RecurringJob.AddOrUpdate<INotificationJobService>(
     "daily-notifications",
     job => job.RunDailyNotificationsAsync(),
     "0 8 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
+);
+
+RecurringJob.AddOrUpdate<IMonthlyReportJobService>(
+    "monthly-report",
+    job => job.RunAsync(),
+    "0 8 1 * *",
     new RecurringJobOptions { TimeZone = colombiaZone }
 );
 
