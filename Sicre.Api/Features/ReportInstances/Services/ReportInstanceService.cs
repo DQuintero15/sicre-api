@@ -138,6 +138,8 @@ public class ReportInstanceService(
                 .ReportInstances.Include(ri => ri.Report)
                 .Include(ri => ri.ResponsibleUser)
                 .Include(ri => ri.SupervisorUser)
+                .Include(ri => ri.Reversions)
+                    .ThenInclude(r => r.CreatedByUser)
                 .FirstOrDefaultAsync(ri => ri.Id == id, ct);
 
             if (instance is null)
@@ -146,7 +148,28 @@ public class ReportInstanceService(
                     "Instancia de reporte no encontrada."
                 );
 
-            return ApiResponse<ReportInstanceResponse>.Ok(ToResponse(instance));
+            var attachmentsCount = await db.ReportAttachments
+                .CountAsync(a => a.ReportInstanceId == id && a.IsActive, ct);
+
+            var response = ToResponse(instance);
+            response.AttachmentsCount = attachmentsCount;
+            response.Reversions = instance.Reversions
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ReportReversionResponse
+                {
+                    Id = r.Id,
+                    PreviousStatus = r.PreviousStatus,
+                    NewStatus = r.NewStatus,
+                    Reason = r.Reason,
+                    CreatedByUserId = r.CreatedByUserId,
+                    CreatedByUserName = r.CreatedByUser is not null
+                        ? $"{r.CreatedByUser.FirstName} {r.CreatedByUser.LastName}"
+                        : null,
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToList();
+
+            return ApiResponse<ReportInstanceResponse>.Ok(response);
         }
         catch (Exception ex)
         {
