@@ -20,7 +20,8 @@ namespace Sicre.Api.Features.ReportInstances.Controllers;
 public class ReportInstancesController(
     IReportInstanceService reportInstanceService,
     IReportAttachmentService attachmentService,
-    IAuditLogService auditLogService
+    IAuditLogService auditLogService,
+    IReportInstanceNoteService noteService
 ) : BaseController
 {
     [HttpGet]
@@ -218,6 +219,32 @@ public class ReportInstancesController(
     )
     {
         var result = await auditLogService.GetAuditAsync(id, ct);
+        return FromResult(result);
+    }
+
+    // ── Notes ────────────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/notes")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceNoteResponse>>>> GetNotes(
+        Guid id,
+        CancellationToken ct
+    )
+    {
+        var result = await noteService.GetByInstanceAsync(id, ct);
+        return FromResult(result);
+    }
+
+    [HttpPost("{id:guid}/notes")]
+    [Authorize(Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.ComplianceSupervisor)}")]
+    public async Task<ActionResult<ApiResponse<ReportInstanceNoteResponse>>> AddNote(
+        Guid id,
+        [FromBody] AddNoteRequest request,
+        CancellationToken ct
+    )
+    {
+        var userId = GetUserId();
+        var role = GetUserRole();
+        var result = await noteService.AddNoteAsync(id, request.Content, userId, role, ct);
         return FromResult(result);
     }
 
