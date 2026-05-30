@@ -4,5 +4,9 @@ namespace Sicre.Api.Features.Analytics.Services;
 
 public interface IAnalyticsExportService
 {
-    Task<ExportPdfResult> ExportAsync(AnalyticsFilterRequest filter, Guid userId, IList<string> userRoles);
+    Task<ExportPdfResult> ExportAsync(
+        AnalyticsFilterRequest filter,
+        Guid userId,
+        IList<string> userRoles
+    );
 }

@@ -37,11 +37,9 @@ public class MonthlyReportPdfGenerator
     }
 
     private static (string text, string bg) RateColors(double rate) =>
-        rate >= 75
-            ? (P.GreenText, P.GreenBg)
-            : rate >= 50
-                ? (P.YellowText, P.YellowBg)
-                : (P.RedText, P.RedBg);
+        rate >= 75 ? (P.GreenText, P.GreenBg)
+        : rate >= 50 ? (P.YellowText, P.YellowBg)
+        : (P.RedText, P.RedBg);
 
     public byte[] Generate(MonthlyReportData data) =>
         Document
@@ -77,11 +75,17 @@ public class MonthlyReportPdfGenerator
             .PaddingVertical(14)
             .Row(row =>
             {
-                row.ConstantItem(110).AlignMiddle().Element(logo =>
-                {
-                    if (data.LogoLlanogas != null)
-                        try { logo.MaxHeight(38).Image(data.LogoLlanogas); } catch { }
-                });
+                row.ConstantItem(110)
+                    .AlignMiddle()
+                    .Element(logo =>
+                    {
+                        if (data.LogoLlanogas != null)
+                            try
+                            {
+                                logo.MaxHeight(38).Image(data.LogoLlanogas);
+                            }
+                            catch { }
+                    });
 
                 row.RelativeItem()
                     .AlignMiddle()
@@ -105,11 +109,18 @@ public class MonthlyReportPdfGenerator
                             .Text(data.GeneratedAt);
                     });
 
-                row.ConstantItem(110).AlignMiddle().AlignRight().Element(logo =>
-                {
-                    if (data.LogoCusianagas != null)
-                        try { logo.MaxHeight(38).Image(data.LogoCusianagas); } catch { }
-                });
+                row.ConstantItem(110)
+                    .AlignMiddle()
+                    .AlignRight()
+                    .Element(logo =>
+                    {
+                        if (data.LogoCusianagas != null)
+                            try
+                            {
+                                logo.MaxHeight(38).Image(data.LogoCusianagas);
+                            }
+                            catch { }
+                    });
             });
     }
 
@@ -309,7 +320,13 @@ public class MonthlyReportPdfGenerator
                         DataCell(table.Cell(), bg, t.Late.ToString(), center: true);
                         DataCell(table.Cell(), bg, t.Overdue.ToString(), center: true);
                         DataCell(table.Cell(), bg, t.Pending.ToString(), center: true);
-                        RateBadgeCell(table.Cell(), bg, $"{t.OnTimePercentage:F1}%", rateText, rateBg);
+                        RateBadgeCell(
+                            table.Cell(),
+                            bg,
+                            $"{t.OnTimePercentage:F1}%",
+                            rateText,
+                            rateBg
+                        );
                     }
                 });
         });

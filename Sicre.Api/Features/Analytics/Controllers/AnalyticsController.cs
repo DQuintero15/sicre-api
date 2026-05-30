@@ -117,11 +117,7 @@ public class AnalyticsController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportPdf([FromQuery] AnalyticsFilterRequest filter)
     {
-        var result = await analyticsExportService.ExportAsync(
-            filter,
-            GetUserId(),
-            GetUserRoles()
-        );
+        var result = await analyticsExportService.ExportAsync(filter, GetUserId(), GetUserRoles());
 
         return File(result.Content, "application/pdf", result.FileName);
     }
