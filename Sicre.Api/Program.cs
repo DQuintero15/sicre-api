@@ -281,8 +281,8 @@ RecurringJob.AddOrUpdate<IMaintenanceJobService>(
 RecurringJob.AddOrUpdate<IReportGenerationJobService>(
     "report-generation",
     job => job.RunAsync(),
-    "0 11 * * *",
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
+    "0 7 * * *",
+    new RecurringJobOptions { TimeZone = colombiaZone }
 );
 
 RecurringJob.AddOrUpdate<INotificationJobService>(
