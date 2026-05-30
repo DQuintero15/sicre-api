@@ -14,6 +14,8 @@ public interface IReportInstanceService
 {
     Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     );
 
@@ -60,12 +62,23 @@ public class ReportInstanceService(
 {
     public async Task<ApiResponse<PagedResult<ReportInstanceSummaryResponse>>> GetAllAsync(
         GetReportInstancesRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     )
     {
         try
         {
-            var query = db.ReportInstances.Include(ri => ri.Report).AsQueryable();
+            var query = db
+                .ReportInstances.Include(ri => ri.Report)
+                    .ThenInclude(r => r!.SenderResponsibleUser)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.EntityUploadResponsibleUser)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.FollowUpLeaderUser)
+                .AsQueryable();
+
+            query = ApplyRoleFilter(query, callerUserId, callerRole);
 
             if (request.ReportId.HasValue)
                 query = query.Where(ri => ri.ReportId == request.ReportId.Value);
@@ -717,4 +730,23 @@ public class ReportInstanceService(
             SentDate = ri.SentDate,
             CreatedAt = ri.CreatedAt,
         };
+
+    private static IQueryable<ReportInstance> ApplyRoleFilter(
+        IQueryable<ReportInstance> query,
+        Guid callerUserId,
+        string callerRole
+    )
+    {
+        if (callerRole == nameof(Role.Administrator) || callerRole == nameof(Role.Auditor))
+            return query;
+
+        if (callerRole == nameof(Role.ComplianceSupervisor))
+            return query.Where(ri => ri.Report!.FollowUpLeaderUserId == callerUserId);
+
+        // ReportResponsible: solo instancias de sus reportes asignados
+        return query.Where(ri =>
+            ri.Report!.SenderResponsibleUserId == callerUserId
+            || ri.Report!.EntityUploadResponsibleUserId == callerUserId
+        );
+    }
 }

@@ -27,7 +27,12 @@ public class ReportInstancesController(
         CancellationToken ct
     )
     {
-        var result = await reportInstanceService.GetAllAsync(request, ct);
+        var result = await reportInstanceService.GetAllAsync(
+            request,
+            GetUserId(),
+            GetUserRole(),
+            ct
+        );
         return FromResult(result);
     }
 

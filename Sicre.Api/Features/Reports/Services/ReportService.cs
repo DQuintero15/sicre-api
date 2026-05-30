@@ -14,6 +14,8 @@ public interface IReportService
 {
     Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
         GetReportsRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     );
 
@@ -48,6 +50,8 @@ public class ReportService(
 {
     public async Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
         GetReportsRequest request,
+        Guid callerUserId,
+        string callerRole,
         CancellationToken ct = default
     )
     {
@@ -62,6 +66,8 @@ public class ReportService(
                 .Include(r => r.Instances)
                     .ThenInclude(i => i.SupervisorUser)
                 .AsQueryable();
+
+            query = ApplyRoleFilter(query, callerUserId, callerRole);
 
             if (request.ControlEntityId.HasValue)
                 query = query.Where(r => r.ControlEntityId == request.ControlEntityId.Value);
@@ -274,18 +280,6 @@ public class ReportService(
                 report.Name = request.Name;
             if (request.LegalBasis != null)
                 report.LegalBasis = request.LegalBasis;
-            if (request.Frequency.HasValue)
-                report.Frequency = request.Frequency.Value;
-            if (request.GenerationMode.HasValue)
-                report.GenerationMode = request.GenerationMode.Value;
-            if (request.DueDateRuleType.HasValue)
-                report.DueDateRuleType = request.DueDateRuleType.Value;
-            if (request.DueDateDay.HasValue)
-                report.DueDateDay = request.DueDateDay;
-            if (request.DueDateMonth.HasValue)
-                report.DueDateMonth = request.DueDateMonth;
-            if (request.DueDateDatesDefinition != null)
-                report.DueDateDatesDefinition = request.DueDateDatesDefinition;
             if (request.OriginalDueDateText != null)
                 report.OriginalDueDateText = request.OriginalDueDateText;
             if (request.AlertEarlyDays.HasValue)
@@ -302,10 +296,16 @@ public class ReportService(
                 report.TemplateFileUrl = request.TemplateFileUrl;
             if (request.NotificationEmails != null)
                 report.NotificationEmails = request.NotificationEmails;
-            if (request.StartDate.HasValue)
-                report.StartDate = request.StartDate.Value;
-            if (request.EndDate.HasValue)
-                report.EndDate = request.EndDate;
+
+            bool entityUploadResponsibleChanged =
+                request.EntityUploadResponsibleUserId.HasValue
+                && request.EntityUploadResponsibleUserId.Value
+                    != report.EntityUploadResponsibleUserId;
+
+            bool followUpLeaderChanged =
+                request.FollowUpLeaderUserId.HasValue
+                && request.FollowUpLeaderUserId.Value != report.FollowUpLeaderUserId;
+
             if (request.SenderResponsibleUserId.HasValue)
                 report.SenderResponsibleUserId = request.SenderResponsibleUserId.Value;
             if (request.EntityUploadResponsibleUserId.HasValue)
@@ -315,6 +315,16 @@ public class ReportService(
 
             report.UpdatedAt = DateTime.UtcNow;
             report.UpdatedByUserId = updatedByUserId;
+
+            if (entityUploadResponsibleChanged || followUpLeaderChanged)
+                await PropagatePendingInstanceResponsiblesAsync(
+                    id,
+                    entityUploadResponsibleChanged
+                        ? request.EntityUploadResponsibleUserId!.Value
+                        : null,
+                    followUpLeaderChanged ? request.FollowUpLeaderUserId!.Value : null,
+                    ct
+                );
 
             await db.SaveChangesAsync(ct);
 
@@ -330,6 +340,26 @@ public class ReportService(
                 HttpStatusCode.InternalServerError,
                 "Error al actualizar el reporte."
             );
+        }
+    }
+
+    private async Task PropagatePendingInstanceResponsiblesAsync(
+        Guid reportId,
+        Guid? newResponsibleUserId,
+        Guid? newSupervisorUserId,
+        CancellationToken ct
+    )
+    {
+        var pendingInstances = await db
+            .ReportInstances.Where(i => i.ReportId == reportId && i.Status == ReportStatus.Pending)
+            .ToListAsync(ct);
+
+        foreach (var instance in pendingInstances)
+        {
+            if (newResponsibleUserId.HasValue)
+                instance.ResponsibleUserId = newResponsibleUserId.Value;
+            if (newSupervisorUserId.HasValue)
+                instance.SupervisorUserId = newSupervisorUserId.Value;
         }
     }
 
@@ -362,6 +392,28 @@ public class ReportService(
                 "Error al desactivar el reporte."
             );
         }
+    }
+
+    private static IQueryable<Report> ApplyRoleFilter(
+        IQueryable<Report> query,
+        Guid callerUserId,
+        string callerRole
+    )
+    {
+        if (
+            callerRole == nameof(Domain.Enums.Role.Administrator)
+            || callerRole == nameof(Domain.Enums.Role.Auditor)
+        )
+            return query;
+
+        if (callerRole == nameof(Domain.Enums.Role.ComplianceSupervisor))
+            return query.Where(r => r.FollowUpLeaderUserId == callerUserId);
+
+        // ReportResponsible: solo sus reportes asignados
+        return query.Where(r =>
+            r.SenderResponsibleUserId == callerUserId
+            || r.EntityUploadResponsibleUserId == callerUserId
+        );
     }
 
     private async Task GenerateInitialProjectionAsync(
