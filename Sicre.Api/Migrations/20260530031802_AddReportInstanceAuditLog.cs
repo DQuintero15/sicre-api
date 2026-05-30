@@ -22,7 +22,10 @@ namespace Sicre.Api.Migrations
                     PerformedByUserId = table.Column<Guid>(type: "uuid", nullable: false),
                     Details = table.Column<string>(type: "text", nullable: true),
                     HumanReadable = table.Column<string>(type: "text", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTime>(
+                        type: "timestamp with time zone",
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
@@ -33,35 +36,38 @@ namespace Sicre.Api.Migrations
                         principalSchema: "identity",
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Cascade
+                    );
                     table.ForeignKey(
                         name: "FK_ReportInstanceAuditEntries_report_instances_ReportInstanceId",
                         column: x => x.ReportInstanceId,
                         principalSchema: "reports",
                         principalTable: "report_instances",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReportInstanceAuditEntries_PerformedByUserId",
                 schema: "identity",
                 table: "ReportInstanceAuditEntries",
-                column: "PerformedByUserId");
+                column: "PerformedByUserId"
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReportInstanceAuditEntries_ReportInstanceId",
                 schema: "identity",
                 table: "ReportInstanceAuditEntries",
-                column: "ReportInstanceId");
+                column: "ReportInstanceId"
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "ReportInstanceAuditEntries",
-                schema: "identity");
+            migrationBuilder.DropTable(name: "ReportInstanceAuditEntries", schema: "identity");
         }
     }
 }

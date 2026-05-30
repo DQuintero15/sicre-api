@@ -44,20 +44,22 @@ public class ReportInstanceNoteService(
                     "Instancia no encontrada."
                 );
 
-            var notes = await db.ReportInstanceNotes
-                .Include(n => n.AuthorUser)
+            var notes = await db
+                .ReportInstanceNotes.Include(n => n.AuthorUser)
                 .Where(n => n.ReportInstanceId == instanceId && n.IsActive)
                 .OrderByDescending(n => n.CreatedAt)
                 .Select(n => new ReportInstanceNoteResponse
                 {
                     Id = n.Id,
                     Content = n.Content,
-                    AuthorName = n.AuthorUser != null
-                        ? $"{n.AuthorUser.FirstName} {n.AuthorUser.LastName}"
-                        : "Usuario",
-                    AuthorInitials = n.AuthorUser != null
-                        ? BuildInitials(n.AuthorUser.FirstName, n.AuthorUser.LastName)
-                        : "U",
+                    AuthorName =
+                        n.AuthorUser != null
+                            ? $"{n.AuthorUser.FirstName} {n.AuthorUser.LastName}"
+                            : "Usuario",
+                    AuthorInitials =
+                        n.AuthorUser != null
+                            ? BuildInitials(n.AuthorUser.FirstName, n.AuthorUser.LastName)
+                            : "U",
                     AuthorRole = n.AuthorRole,
                     CreatedAt = n.CreatedAt,
                 })
@@ -114,15 +116,17 @@ public class ReportInstanceNoteService(
 
             await alertService.NotifyInstanceEventAsync(instanceId, "NoteAdded", authorUserId, ct);
 
-            return ApiResponse<ReportInstanceNoteResponse>.Ok(new ReportInstanceNoteResponse
-            {
-                Id = note.Id,
-                Content = note.Content,
-                AuthorName = $"{author.FirstName} {author.LastName}",
-                AuthorInitials = BuildInitials(author.FirstName, author.LastName),
-                AuthorRole = note.AuthorRole,
-                CreatedAt = note.CreatedAt,
-            });
+            return ApiResponse<ReportInstanceNoteResponse>.Ok(
+                new ReportInstanceNoteResponse
+                {
+                    Id = note.Id,
+                    Content = note.Content,
+                    AuthorName = $"{author.FirstName} {author.LastName}",
+                    AuthorInitials = BuildInitials(author.FirstName, author.LastName),
+                    AuthorRole = note.AuthorRole,
+                    CreatedAt = note.CreatedAt,
+                }
+            );
         }
         catch (Exception ex)
         {
@@ -137,8 +141,10 @@ public class ReportInstanceNoteService(
     private static string BuildInitials(string firstName, string lastName)
     {
         var initials = string.Empty;
-        if (!string.IsNullOrWhiteSpace(firstName)) initials += char.ToUpper(firstName.Trim()[0]);
-        if (!string.IsNullOrWhiteSpace(lastName)) initials += char.ToUpper(lastName.Trim()[0]);
+        if (!string.IsNullOrWhiteSpace(firstName))
+            initials += char.ToUpper(firstName.Trim()[0]);
+        if (!string.IsNullOrWhiteSpace(lastName))
+            initials += char.ToUpper(lastName.Trim()[0]);
         return initials.Length > 0 ? initials : "U";
     }
 }

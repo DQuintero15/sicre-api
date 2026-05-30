@@ -22,7 +22,10 @@ namespace Sicre.Api.Migrations
                     AuthorUserId = table.Column<Guid>(type: "uuid", nullable: false),
                     AuthorRole = table.Column<string>(type: "text", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTime>(
+                        type: "timestamp with time zone",
+                        nullable: false
+                    ),
                 },
                 constraints: table =>
                 {
@@ -33,35 +36,38 @@ namespace Sicre.Api.Migrations
                         principalSchema: "identity",
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Cascade
+                    );
                     table.ForeignKey(
                         name: "FK_ReportInstanceNotes_report_instances_ReportInstanceId",
                         column: x => x.ReportInstanceId,
                         principalSchema: "reports",
                         principalTable: "report_instances",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReportInstanceNotes_AuthorUserId",
                 schema: "identity",
                 table: "ReportInstanceNotes",
-                column: "AuthorUserId");
+                column: "AuthorUserId"
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReportInstanceNotes_ReportInstanceId",
                 schema: "identity",
                 table: "ReportInstanceNotes",
-                column: "ReportInstanceId");
+                column: "ReportInstanceId"
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "ReportInstanceNotes",
-                schema: "identity");
+            migrationBuilder.DropTable(name: "ReportInstanceNotes", schema: "identity");
         }
     }
 }

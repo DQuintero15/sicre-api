@@ -67,7 +67,14 @@ public class ReportAttachmentService(
                 "Para este tipo de soporte, usa la opción de registrar reversión."
             );
 
-        var result = await AddFileCoreAsync(instanceId, type, fileStream, fileName, contentType, userId);
+        var result = await AddFileCoreAsync(
+            instanceId,
+            type,
+            fileStream,
+            fileName,
+            contentType,
+            userId
+        );
 
         if (result.Success)
         {

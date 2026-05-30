@@ -61,7 +61,9 @@ public class AnalyticsService(
             query = query.Where(i => i.ResponsibleUserId == filter.ResponsibleUserId.Value);
 
         if (filter.BranchId.HasValue)
-            query = query.Where(i => i.Report != null && i.Report.BranchId == filter.BranchId.Value);
+            query = query.Where(i =>
+                i.Report != null && i.Report.BranchId == filter.BranchId.Value
+            );
 
         return query;
     }
@@ -457,7 +459,9 @@ public class AnalyticsService(
                         Overdue: overdue,
                         Pending: pend,
                         OnTimeRate: total > 0 ? Math.Round((double)onTime / total * 100, 2) : 0,
-                        DeliveryRate: total > 0 ? Math.Round((double)(onTime + late) / total * 100, 2) : 0
+                        DeliveryRate: total > 0
+                            ? Math.Round((double)(onTime + late) / total * 100, 2)
+                            : 0
                     );
                 })
                 .OrderByDescending(x => x.OnTimeRate)

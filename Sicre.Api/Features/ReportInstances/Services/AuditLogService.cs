@@ -29,10 +29,8 @@ public interface IAuditLogService
     );
 }
 
-public class AuditLogService(
-    ApplicationDbContext db,
-    ILogger<AuditLogService> logger
-) : IAuditLogService
+public class AuditLogService(ApplicationDbContext db, ILogger<AuditLogService> logger)
+    : IAuditLogService
 {
     public async Task RecordAsync(
         string action,
@@ -81,8 +79,8 @@ public class AuditLogService(
                     "Instancia no encontrada."
                 );
 
-            var items = await db.ReportInstanceAuditEntries
-                .Include(e => e.PerformedByUser)
+            var items = await db
+                .ReportInstanceAuditEntries.Include(e => e.PerformedByUser)
                 .Where(e => e.ReportInstanceId == instanceId)
                 .OrderByDescending(e => e.CreatedAt)
                 .Select(e => new ReportInstanceActivityResponse
@@ -90,9 +88,10 @@ public class AuditLogService(
                     Id = e.Id,
                     Action = e.Action,
                     HumanReadable = e.HumanReadable,
-                    PerformedByUserName = e.PerformedByUser != null
-                        ? $"{e.PerformedByUser.FirstName} {e.PerformedByUser.LastName}"
-                        : null,
+                    PerformedByUserName =
+                        e.PerformedByUser != null
+                            ? $"{e.PerformedByUser.FirstName} {e.PerformedByUser.LastName}"
+                            : null,
                     CreatedAt = e.CreatedAt,
                 })
                 .ToListAsync(ct);
@@ -101,7 +100,11 @@ public class AuditLogService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error al obtener actividad de instancia {InstanceId}.", instanceId);
+            logger.LogError(
+                ex,
+                "Error al obtener actividad de instancia {InstanceId}.",
+                instanceId
+            );
             return ApiResponse<IReadOnlyList<ReportInstanceActivityResponse>>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error al obtener la actividad."
@@ -123,8 +126,8 @@ public class AuditLogService(
                     "Instancia no encontrada."
                 );
 
-            var items = await db.ReportInstanceAuditEntries
-                .Include(e => e.PerformedByUser)
+            var items = await db
+                .ReportInstanceAuditEntries.Include(e => e.PerformedByUser)
                 .Where(e => e.ReportInstanceId == instanceId)
                 .OrderByDescending(e => e.CreatedAt)
                 .Select(e => new ReportInstanceAuditEntryResponse
@@ -132,9 +135,10 @@ public class AuditLogService(
                     Id = e.Id,
                     Action = e.Action,
                     HumanReadable = e.HumanReadable,
-                    PerformedByUserName = e.PerformedByUser != null
-                        ? $"{e.PerformedByUser.FirstName} {e.PerformedByUser.LastName}"
-                        : null,
+                    PerformedByUserName =
+                        e.PerformedByUser != null
+                            ? $"{e.PerformedByUser.FirstName} {e.PerformedByUser.LastName}"
+                            : null,
                     Details = e.Details,
                     CreatedAt = e.CreatedAt,
                 })
@@ -144,7 +148,11 @@ public class AuditLogService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error al obtener auditoría de instancia {InstanceId}.", instanceId);
+            logger.LogError(
+                ex,
+                "Error al obtener auditoría de instancia {InstanceId}.",
+                instanceId
+            );
             return ApiResponse<IReadOnlyList<ReportInstanceAuditEntryResponse>>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error al obtener la auditoría."

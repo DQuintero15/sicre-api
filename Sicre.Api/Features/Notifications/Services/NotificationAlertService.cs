@@ -37,8 +37,8 @@ public class NotificationAlertService(
             var settings = await db.SICRESettings.FirstOrDefaultAsync(ct);
             var autoNotify = settings?.AutoNotify ?? false;
 
-            var instance = await db.ReportInstances
-                .Include(i => i.Report)
+            var instance = await db
+                .ReportInstances.Include(i => i.Report)
                     .ThenInclude(r => r!.ControlEntity)
                 .Include(i => i.ResponsibleUser)
                 .Include(i => i.SupervisorUser)
@@ -140,7 +140,8 @@ public class NotificationAlertService(
         var reportCode = instance.Report?.Code ?? string.Empty;
         var reportName = instance.Report?.Name ?? "Reporte";
         var periodName = instance.PeriodName;
-        var entityAbbr = instance.Report?.ControlEntity?.Abbreviation
+        var entityAbbr =
+            instance.Report?.ControlEntity?.Abbreviation
             ?? instance.Report?.ControlEntity?.Name
             ?? string.Empty;
         var prefix = string.IsNullOrWhiteSpace(entityAbbr) ? string.Empty : $"[{entityAbbr}] ";

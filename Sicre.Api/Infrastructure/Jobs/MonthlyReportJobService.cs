@@ -36,15 +36,30 @@ public class MonthlyReportJobService(
             var (prevYear, prevMonth) = GetPreviousMonth();
             var periodLabel = $"{SpanishMonthName(prevMonth)} {prevYear}";
 
-            logger.LogInformation("MonthlyReportJob: generando informe para {Period}.", periodLabel);
+            logger.LogInformation(
+                "MonthlyReportJob: generando informe para {Period}.",
+                periodLabel
+            );
 
             // ─── Fetch analytics data ─────────────────────────────────
-            var startDate  = new DateOnly(prevYear, prevMonth, 1);
-            var endDate    = new DateOnly(prevYear, prevMonth, DateTime.DaysInMonth(prevYear, prevMonth));
+            var startDate = new DateOnly(prevYear, prevMonth, 1);
+            var endDate = new DateOnly(
+                prevYear,
+                prevMonth,
+                DateTime.DaysInMonth(prevYear, prevMonth)
+            );
             var trendStart = startDate.AddMonths(-11);
 
-            var monthFilter = new AnalyticsFilterRequest { StartDate = startDate, EndDate = endDate };
-            var trendFilter = new AnalyticsFilterRequest { StartDate = trendStart, EndDate = endDate };
+            var monthFilter = new AnalyticsFilterRequest
+            {
+                StartDate = startDate,
+                EndDate = endDate,
+            };
+            var trendFilter = new AnalyticsFilterRequest
+            {
+                StartDate = trendStart,
+                EndDate = endDate,
+            };
 
             var systemId = Guid.Empty;
 
@@ -58,40 +73,46 @@ public class MonthlyReportJobService(
 
             await Task.WhenAll(distTask, trendTask, entityTask, responsibleTask, branchTask);
 
-            var dist        = distTask.Result.Data ?? new StateDistributionDto();
-            var trend       = trendTask.Result.Data ?? [];
-            var entities    = entityTask.Result.Data ?? [];
+            var dist = distTask.Result.Data ?? new StateDistributionDto();
+            var trend = trendTask.Result.Data ?? [];
+            var entities = entityTask.Result.Data ?? [];
             var responsible = responsibleTask.Result.Data ?? [];
-            var branches    = branchTask.Result.Data ?? [];
+            var branches = branchTask.Result.Data ?? [];
 
             // ─── Load logos ───────────────────────────────────────────
-            var assetsPath      = Path.Combine(env.ContentRootPath, "Assets", "Images");
-            var logoLlanogas    = TryReadFile(Path.Combine(assetsPath, "logo-llanogas.webp"));
-            var logoCusianagas  = TryReadFile(Path.Combine(assetsPath, "logo-cusianagas.webp"));
+            var assetsPath = Path.Combine(env.ContentRootPath, "Assets", "Images");
+            var logoLlanogas = TryReadFile(Path.Combine(assetsPath, "logo-llanogas.webp"));
+            var logoCusianagas = TryReadFile(Path.Combine(assetsPath, "logo-cusianagas.webp"));
 
             // ─── Generate PDF ─────────────────────────────────────────
             var now = dateHelper.GetCurrentDateTime();
             var reportData = new MonthlyReportData
             {
-                PeriodLabel       = periodLabel,
-                PeriodYear        = prevYear,
-                PeriodMonth       = prevMonth,
-                GeneratedAt       = $"Generado el {now.Day} de {SpanishMonthName(now.Month)} de {now.Year}",
+                PeriodLabel = periodLabel,
+                PeriodYear = prevYear,
+                PeriodMonth = prevMonth,
+                GeneratedAt =
+                    $"Generado el {now.Day} de {SpanishMonthName(now.Month)} de {now.Year}",
                 StateDistribution = dist,
-                Trend             = trend,
-                ByEntity          = entities,
-                ByResponsible     = responsible,
-                ByBranch          = branches,
-                LogoLlanogas      = logoLlanogas,
-                LogoCusianagas    = logoCusianagas,
+                Trend = trend,
+                ByEntity = entities,
+                ByResponsible = responsible,
+                ByBranch = branches,
+                LogoLlanogas = logoLlanogas,
+                LogoCusianagas = logoCusianagas,
             };
 
             var pdfBytes = pdfGenerator.Generate(reportData);
-            logger.LogInformation("MonthlyReportJob: PDF generado ({Bytes} bytes).", pdfBytes.Length);
+            logger.LogInformation(
+                "MonthlyReportJob: PDF generado ({Bytes} bytes).",
+                pdfBytes.Length
+            );
 
             // ─── Get recipients ───────────────────────────────────────
-            var adminUsers      = await userManager.GetUsersInRoleAsync(nameof(Role.Administrator));
-            var supervisorUsers = await userManager.GetUsersInRoleAsync(nameof(Role.ComplianceSupervisor));
+            var adminUsers = await userManager.GetUsersInRoleAsync(nameof(Role.Administrator));
+            var supervisorUsers = await userManager.GetUsersInRoleAsync(
+                nameof(Role.ComplianceSupervisor)
+            );
 
             var recipients = adminUsers
                 .Concat(supervisorUsers)
@@ -102,11 +123,11 @@ public class MonthlyReportJobService(
             logger.LogInformation("MonthlyReportJob: {Count} destinatarios.", recipients.Count);
 
             // ─── Send emails ──────────────────────────────────────────
-            var subject     = $"SICRE — Informe Mensual de Cumplimiento · {periodLabel}";
-            var attachment  = new EmailAttachment
+            var subject = $"SICRE — Informe Mensual de Cumplimiento · {periodLabel}";
+            var attachment = new EmailAttachment
             {
-                FileName    = $"Informe_Cumplimiento_{prevYear}_{prevMonth:D2}.pdf",
-                Content     = pdfBytes,
+                FileName = $"Informe_Cumplimiento_{prevYear}_{prevMonth:D2}.pdf",
+                Content = pdfBytes,
                 ContentType = "application/pdf",
             };
 
@@ -114,11 +135,22 @@ public class MonthlyReportJobService(
             foreach (var user in recipients)
             {
                 var body = emailTemplateService.GetMonthlyReportEmailTemplate(periodLabel);
-                var ok   = await emailService.SendEmailAsync(user.Email!, subject, body, true, [attachment]);
-                if (ok) sent++;
+                var ok = await emailService.SendEmailAsync(
+                    user.Email!,
+                    subject,
+                    body,
+                    true,
+                    [attachment]
+                );
+                if (ok)
+                    sent++;
             }
 
-            logger.LogInformation("MonthlyReportJob completado. Emails enviados: {Sent}/{Total}.", sent, recipients.Count);
+            logger.LogInformation(
+                "MonthlyReportJob completado. Emails enviados: {Sent}/{Total}.",
+                sent,
+                recipients.Count
+            );
         }
         catch (Exception ex)
         {
@@ -138,24 +170,31 @@ public class MonthlyReportJobService(
 
     private static byte[]? TryReadFile(string path)
     {
-        try { return File.Exists(path) ? File.ReadAllBytes(path) : null; }
-        catch { return null; }
+        try
+        {
+            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
-    private static string SpanishMonthName(int month) => month switch
-    {
-        1  => "Enero",
-        2  => "Febrero",
-        3  => "Marzo",
-        4  => "Abril",
-        5  => "Mayo",
-        6  => "Junio",
-        7  => "Julio",
-        8  => "Agosto",
-        9  => "Septiembre",
-        10 => "Octubre",
-        11 => "Noviembre",
-        12 => "Diciembre",
-        _  => month.ToString(),
-    };
+    private static string SpanishMonthName(int month) =>
+        month switch
+        {
+            1 => "Enero",
+            2 => "Febrero",
+            3 => "Marzo",
+            4 => "Abril",
+            5 => "Mayo",
+            6 => "Junio",
+            7 => "Julio",
+            8 => "Agosto",
+            9 => "Septiembre",
+            10 => "Octubre",
+            11 => "Noviembre",
+            12 => "Diciembre",
+            _ => month.ToString(),
+        };
 }

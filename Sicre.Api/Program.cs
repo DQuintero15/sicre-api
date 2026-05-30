@@ -2,7 +2,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Serialization;
-using QuestPDF.Infrastructure;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
@@ -12,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using QuestPDF.Infrastructure;
 using Scalar.AspNetCore;
 using Sicre.Api.Config;
 using Sicre.Api.Domain.Entities;
@@ -34,11 +34,11 @@ using Sicre.Api.Infrastructure.Hangfire;
 using Sicre.Api.Infrastructure.Jobs;
 using Sicre.Api.Infrastructure.Middleware;
 using Sicre.Api.Infrastructure.Persistence;
-using Sicre.Api.Shared.Reports;
 using Sicre.Api.Infrastructure.Persistence.Seeders;
 using Sicre.Api.Infrastructure.Workers;
 using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
+using Sicre.Api.Shared.Reports;
 
 QuestPDF.Settings.License = LicenseType.Community;
 

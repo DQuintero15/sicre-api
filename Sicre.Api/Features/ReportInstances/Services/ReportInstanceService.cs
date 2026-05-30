@@ -150,13 +150,15 @@ public class ReportInstanceService(
                     "Instancia de reporte no encontrada."
                 );
 
-            var attachmentsCount = await db.ReportAttachments
-                .CountAsync(a => a.ReportInstanceId == id && a.IsActive, ct);
+            var attachmentsCount = await db.ReportAttachments.CountAsync(
+                a => a.ReportInstanceId == id && a.IsActive,
+                ct
+            );
 
             var response = ToResponse(instance);
             response.AttachmentsCount = attachmentsCount;
-            response.Reversions = instance.Reversions
-                .OrderByDescending(r => r.CreatedAt)
+            response.Reversions = instance
+                .Reversions.OrderByDescending(r => r.CreatedAt)
                 .Select(r => new ReportReversionResponse
                 {
                     Id = r.Id,
@@ -378,7 +380,12 @@ public class ReportInstanceService(
                 await db.Entry(instance).Reference(ri => ri.SupervisorUser).LoadAsync(ct);
 
             if (request.DueDate.HasValue)
-                await alertService.NotifyInstanceEventAsync(instance.Id, "DeadlineExtended", updatedByUserId, ct);
+                await alertService.NotifyInstanceEventAsync(
+                    instance.Id,
+                    "DeadlineExtended",
+                    updatedByUserId,
+                    ct
+                );
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),
@@ -455,10 +462,20 @@ public class ReportInstanceService(
                 instance.Id,
                 revertedByUserId,
                 $"{reverterName} revirtió la instancia. Motivo: {request.Reason}",
-                new { previousStatus = previousStatus.ToString(), newStatus = newStatus.ToString(), reason = request.Reason }
+                new
+                {
+                    previousStatus = previousStatus.ToString(),
+                    newStatus = newStatus.ToString(),
+                    reason = request.Reason,
+                }
             );
 
-            await alertService.NotifyInstanceEventAsync(instance.Id, "Reverted", revertedByUserId, ct);
+            await alertService.NotifyInstanceEventAsync(
+                instance.Id,
+                "Reverted",
+                revertedByUserId,
+                ct
+            );
 
             return ApiResponse<ReportInstanceResponse>.Ok(
                 ToResponse(instance),

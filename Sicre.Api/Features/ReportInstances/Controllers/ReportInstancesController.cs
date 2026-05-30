@@ -202,21 +202,21 @@ public class ReportInstancesController(
     // ── Activity / Audit ─────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/activity")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceActivityResponse>>>> GetActivity(
-        Guid id,
-        CancellationToken ct
-    )
+    public async Task<
+        ActionResult<ApiResponse<IReadOnlyList<ReportInstanceActivityResponse>>>
+    > GetActivity(Guid id, CancellationToken ct)
     {
         var result = await auditLogService.GetActivityAsync(id, ct);
         return FromResult(result);
     }
 
     [HttpGet("{id:guid}/audit")]
-    [Authorize(Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.Auditor)}")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceAuditEntryResponse>>>> GetAudit(
-        Guid id,
-        CancellationToken ct
-    )
+    [Authorize(
+        Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.Auditor)}"
+    )]
+    public async Task<
+        ActionResult<ApiResponse<IReadOnlyList<ReportInstanceAuditEntryResponse>>>
+    > GetAudit(Guid id, CancellationToken ct)
     {
         var result = await auditLogService.GetAuditAsync(id, ct);
         return FromResult(result);
@@ -225,17 +225,18 @@ public class ReportInstancesController(
     // ── Notes ────────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/notes")]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<ReportInstanceNoteResponse>>>> GetNotes(
-        Guid id,
-        CancellationToken ct
-    )
+    public async Task<
+        ActionResult<ApiResponse<IReadOnlyList<ReportInstanceNoteResponse>>>
+    > GetNotes(Guid id, CancellationToken ct)
     {
         var result = await noteService.GetByInstanceAsync(id, ct);
         return FromResult(result);
     }
 
     [HttpPost("{id:guid}/notes")]
-    [Authorize(Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.ComplianceSupervisor)}")]
+    [Authorize(
+        Roles = $"{nameof(Domain.Enums.Role.Administrator)},{nameof(Domain.Enums.Role.ComplianceSupervisor)}"
+    )]
     public async Task<ActionResult<ApiResponse<ReportInstanceNoteResponse>>> AddNote(
         Guid id,
         [FromBody] AddNoteRequest request,
