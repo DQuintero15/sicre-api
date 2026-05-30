@@ -65,6 +65,8 @@ public class ReportService(
                     .ThenInclude(i => i.ResponsibleUser)
                 .Include(r => r.Instances)
                     .ThenInclude(i => i.SupervisorUser)
+                .Include(r => r.Instances)
+                    .ThenInclude(i => i.Attachments)
                 .AsQueryable();
 
             query = ApplyRoleFilter(query, callerUserId, callerRole);
@@ -574,6 +576,7 @@ public class ReportService(
                         i.SupervisorUser != null
                             ? $"{i.SupervisorUser.FirstName} {i.SupervisorUser.LastName}"
                             : null,
+                    AttachmentsCount = i.Attachments?.Count(a => a.IsActive) ?? 0,
                     CreatedAt = i.CreatedAt,
                 })
                 .ToList(),
