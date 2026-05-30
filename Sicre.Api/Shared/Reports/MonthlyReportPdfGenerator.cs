@@ -125,18 +125,28 @@ public class MonthlyReportPdfGenerator
             col.Item().Element(c2 => KpiSummary(c2, data.StateDistribution));
 
             if (data.Trend.Count > 0)
-                col.Item().PaddingTop(22).Element(c2 => TrendSection(c2, data.Trend));
+            {
+                col.Item().PageBreak();
+                col.Item().Element(c2 => TrendSection(c2, data.Trend));
+            }
 
             if (data.ByEntity.Count > 0)
-                col.Item().PaddingTop(22).Element(c2 => EntitySection(c2, data.ByEntity));
+            {
+                col.Item().PageBreak();
+                col.Item().Element(c2 => EntitySection(c2, data.ByEntity));
+            }
 
             if (data.ByBranch.Count > 0)
-                col.Item().PaddingTop(22).Element(c2 => BranchSection(c2, data.ByBranch));
+            {
+                col.Item().PageBreak();
+                col.Item().Element(c2 => BranchSection(c2, data.ByBranch));
+            }
 
             if (data.ByResponsible.Count > 0)
-                col.Item()
-                    .PaddingTop(22)
-                    .Element(c2 => ResponsibleSection(c2, data.ByResponsible));
+            {
+                col.Item().PageBreak();
+                col.Item().Element(c2 => ResponsibleSection(c2, data.ByResponsible));
+            }
 
             col.Item()
                 .PaddingTop(28)
@@ -429,15 +439,9 @@ public class MonthlyReportPdfGenerator
 
     private static void ResponsibleSection(IContainer c, List<ResponsibleComplianceDto> items)
     {
-        var top = items.OrderByDescending(x => x.OnTimeRate).Take(20).ToList();
-        var title =
-            items.Count > 20
-                ? $"Cumplimiento por Responsable — Top 20 de {items.Count}"
-                : "Cumplimiento por Responsable";
-
         c.Column(col =>
         {
-            col.Item().Element(SectionTitle(title));
+            col.Item().Element(SectionTitle("Cumplimiento por Responsable"));
             col.Item()
                 .PaddingTop(10)
                 .Table(table =>
@@ -470,7 +474,7 @@ public class MonthlyReportPdfGenerator
 
                     bool alt = false;
                     int i = 1;
-                    foreach (var item in top)
+                    foreach (var item in items.OrderByDescending(x => x.OnTimeRate))
                     {
                         var bg = alt ? P.RowAlt : P.White;
                         alt = !alt;
