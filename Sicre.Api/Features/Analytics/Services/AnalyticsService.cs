@@ -263,7 +263,6 @@ public class AnalyticsService(
         try
         {
             var query = BuildBaseQuery(userId, userRoles);
-            query = query.Include(i => i.ResponsibleUser);
             query = ApplyFilters(query, filter);
 
             var flatData = await query

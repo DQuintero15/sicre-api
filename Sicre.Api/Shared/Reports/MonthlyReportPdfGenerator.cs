@@ -126,26 +126,22 @@ public class MonthlyReportPdfGenerator
 
             if (data.Trend.Count > 0)
             {
-                col.Item().PageBreak();
-                col.Item().Element(c2 => TrendSection(c2, data.Trend));
+                col.Item().PaddingTop(22).Element(c2 => TrendSection(c2, data.Trend));
             }
 
             if (data.ByEntity.Count > 0)
             {
-                col.Item().PageBreak();
-                col.Item().Element(c2 => EntitySection(c2, data.ByEntity));
+                col.Item().PaddingTop(22).Element(c2 => EntitySection(c2, data.ByEntity));
             }
 
             if (data.ByBranch.Count > 0)
             {
-                col.Item().PageBreak();
-                col.Item().Element(c2 => BranchSection(c2, data.ByBranch));
+                col.Item().PaddingTop(22).Element(c2 => BranchSection(c2, data.ByBranch));
             }
 
             if (data.ByResponsible.Count > 0)
             {
-                col.Item().PageBreak();
-                col.Item().Element(c2 => ResponsibleSection(c2, data.ByResponsible));
+                col.Item().PaddingTop(22).Element(c2 => ResponsibleSection(c2, data.ByResponsible));
             }
 
             col.Item()
