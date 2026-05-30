@@ -450,6 +450,7 @@ public class MonthlyReportPdfGenerator
                         cols.RelativeColumn(1f);
                         cols.RelativeColumn(1f);
                         cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
                         cols.RelativeColumn(1.3f);
                     });
 
@@ -462,6 +463,7 @@ public class MonthlyReportPdfGenerator
                             "A Tiempo",
                             "Tarde",
                             "No Report.",
+                            "Pendiente",
                             "Cumplimiento"
                         )
                     );
@@ -480,6 +482,7 @@ public class MonthlyReportPdfGenerator
                         DataCell(table.Cell(), bg, item.OnTime.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.Late.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Pending.ToString(), center: true);
                         RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
                     }
                 });

@@ -204,7 +204,6 @@ public class AnalyticsService(
         try
         {
             var query = BuildBaseQuery(userId, userRoles);
-            query = query.Include(i => i.Report).ThenInclude(r => r!.ControlEntity);
             query = ApplyFilters(query, filter);
 
             var flatData = await query
@@ -428,7 +427,6 @@ public class AnalyticsService(
         try
         {
             var query = BuildBaseQuery(userId, userRoles);
-            query = query.Include(i => i.Report).ThenInclude(r => r!.Branch);
             query = ApplyFilters(query, filter);
 
             var flatData = await query
