@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
+using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Features.Reports.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
@@ -101,8 +102,48 @@ public class ReportService(
             }
 
             var total = await query.CountAsync(ct);
-            var items = await query
-                .OrderBy(r => r.Name)
+
+            // ── Smart default ordering ────────────────────────────────
+            // Priority: overdue instances > pending count > name
+            IOrderedQueryable<Report> orderedQuery;
+
+            if (request.SortBy.HasValue)
+            {
+                var descending = request.SortDescending ?? false;
+                orderedQuery = (request.SortBy.Value, descending) switch
+                {
+                    (ReportSortBy.Name, false) => query.OrderBy(r => r.Name),
+                    (ReportSortBy.Name, true) => query.OrderByDescending(r => r.Name),
+                    (ReportSortBy.CreatedAt, false) => query.OrderBy(r => r.CreatedAt),
+                    (ReportSortBy.CreatedAt, true) => query.OrderByDescending(r => r.CreatedAt),
+                    (ReportSortBy.OverdueInstances, false) => query.OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue)),
+                    (ReportSortBy.OverdueInstances, true) => query.OrderByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue)),
+                    (ReportSortBy.PendingInstances, false) => query.OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Pending)),
+                    (ReportSortBy.PendingInstances, true) => query.OrderByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Pending)),
+                    (ReportSortBy.TotalInstances, false) => query.OrderBy(r => r.Instances.Count),
+                    (ReportSortBy.TotalInstances, true) => query.OrderByDescending(r => r.Instances.Count),
+                    (ReportSortBy.LastSentDate, false) => query.OrderBy(r => r.Instances
+                        .Where(i => i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate)
+                        .Select(i => i.SentDate)
+                        .Max()),
+                    (ReportSortBy.LastSentDate, true) => query.OrderByDescending(r => r.Instances
+                        .Where(i => i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate)
+                        .Select(i => i.SentDate)
+                        .Max()),
+                    _ => query.OrderBy(r => r.Name),
+                };
+            }
+            else
+            {
+                // Default: overdue first, then pending count, then name
+                orderedQuery = query
+                    .OrderBy(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue) > 0 ? 0 : 1)
+                    .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Overdue))
+                    .ThenByDescending(r => r.Instances.Count(i => i.Status == ReportStatus.Pending))
+                    .ThenBy(r => r.Name);
+            }
+
+            var items = await orderedQuery
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
                 .ToListAsync(ct);
