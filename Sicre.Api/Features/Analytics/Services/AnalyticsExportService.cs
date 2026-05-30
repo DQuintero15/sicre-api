@@ -15,21 +15,16 @@ public sealed class AnalyticsExportService(
         IList<string> userRoles
     )
     {
-        var (distTask, trendTask, entityTask, responsibleTask, branchTask) = (
-            analyticsService.GetStateDistributionAsync(userId, userRoles, filter),
-            analyticsService.GetComplianceTrendAsync(userId, userRoles, filter),
-            analyticsService.GetComplianceByEntityAsync(userId, userRoles, filter),
-            analyticsService.GetComplianceByResponsibleAsync(userId, userRoles, filter),
-            analyticsService.GetComplianceByBranchAsync(userId, userRoles, filter)
-        );
-
-        await Task.WhenAll(distTask, trendTask, entityTask, responsibleTask, branchTask);
-
-        var dist = distTask.Result.Data ?? new StateDistributionDto();
-        var trend = trendTask.Result.Data ?? [];
-        var entities = entityTask.Result.Data ?? [];
-        var responsible = responsibleTask.Result.Data ?? [];
-        var branches = branchTask.Result.Data ?? [];
+        var dist = (await analyticsService.GetStateDistributionAsync(userId, userRoles, filter)).Data
+            ?? new StateDistributionDto();
+        var trend = (await analyticsService.GetComplianceTrendAsync(userId, userRoles, filter)).Data
+            ?? [];
+        var entities = (await analyticsService.GetComplianceByEntityAsync(userId, userRoles, filter)).Data
+            ?? [];
+        var responsible = (await analyticsService.GetComplianceByResponsibleAsync(userId, userRoles, filter)).Data
+            ?? [];
+        var branches = (await analyticsService.GetComplianceByBranchAsync(userId, userRoles, filter)).Data
+            ?? [];
 
         var now = DateTime.UtcNow;
         var dateRangeLabel = BuildDateRangeLabel(filter);

@@ -77,26 +77,12 @@ public class MonthlyReportPdfGenerator
             .PaddingVertical(14)
             .Row(row =>
             {
-                // Logos Llanogas + Cusianagas (juntos a la izquierda)
-                row.ConstantItem(100).AlignMiddle().Row(logos =>
+                row.ConstantItem(110).AlignMiddle().Element(logo =>
                 {
                     if (data.LogoLlanogas != null)
-                        logos.ConstantItem(55).AlignMiddle().Element(l =>
-                        {
-                            try { l.MaxHeight(24).Image(data.LogoLlanogas); } catch { }
-                        });
-
-                    if (data.LogoLlanogas != null && data.LogoCusianagas != null)
-                        logos.ConstantItem(8); // spacer
-
-                    if (data.LogoCusianagas != null)
-                        logos.ConstantItem(37).AlignMiddle().Element(l =>
-                        {
-                            try { l.MaxHeight(18).Image(data.LogoCusianagas); } catch { }
-                        });
+                        try { logo.MaxHeight(38).Image(data.LogoLlanogas); } catch { }
                 });
 
-                // Title block
                 row.RelativeItem()
                     .AlignMiddle()
                     .Column(col =>
@@ -118,6 +104,12 @@ public class MonthlyReportPdfGenerator
                             .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextLight))
                             .Text(data.GeneratedAt);
                     });
+
+                row.ConstantItem(110).AlignMiddle().AlignRight().Element(logo =>
+                {
+                    if (data.LogoCusianagas != null)
+                        try { logo.MaxHeight(38).Image(data.LogoCusianagas); } catch { }
+                });
             });
     }
 
@@ -400,6 +392,7 @@ public class MonthlyReportPdfGenerator
                         cols.RelativeColumn(1f);
                         cols.RelativeColumn(1f);
                         cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
                         cols.RelativeColumn(1.3f);
                     });
 
@@ -412,6 +405,7 @@ public class MonthlyReportPdfGenerator
                             "A Tiempo",
                             "Tarde",
                             "No Report.",
+                            "Pendiente",
                             "Cumplimiento"
                         )
                     );
@@ -430,6 +424,7 @@ public class MonthlyReportPdfGenerator
                         DataCell(table.Cell(), bg, item.OnTime.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.Late.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Pending.ToString(), center: true);
                         RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
                     }
                 });
@@ -588,17 +583,17 @@ public class MonthlyReportPdfGenerator
             .BorderBottom(1)
             .BorderColor(P.Border)
             .PaddingHorizontal(4)
-            .PaddingVertical(4)
-            .AlignCenter()
-            .AlignMiddle()
-            .Background(rowBg)
-            .Element(inner =>
-                inner
+            .PaddingVertical(5)
+            .Row(r =>
+            {
+                r.RelativeItem();
+                r.AutoItem()
                     .Background(badgeBg)
-                    .PaddingHorizontal(6)
+                    .PaddingHorizontal(5)
                     .PaddingVertical(2)
                     .DefaultTextStyle(ts => ts.FontSize(8f).SemiBold().FontColor(textColor))
-                    .Text(text)
-            );
+                    .Text(text);
+                r.RelativeItem();
+            });
     }
 }
