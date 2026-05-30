@@ -26,5 +26,6 @@ public class ReportSummaryResponse
     public int PendingInstances { get; set; }
     public int OverdueInstances { get; set; }
     public int CompletedInstances { get; set; }
+    public DateTime? LastSentDate { get; set; }
     public List<ReportInstanceSummaryResponse> Instances { get; set; } = [];
 }

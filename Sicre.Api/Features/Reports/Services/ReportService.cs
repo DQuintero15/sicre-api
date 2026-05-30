@@ -545,6 +545,13 @@ public class ReportService(
             CompletedInstances = instances.Count(i =>
                 i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
             ),
+            LastSentDate = instances
+                .Where(i =>
+                    i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
+                )
+                .Select(i => i.SentDate)
+                .OrderByDescending(d => d)
+                .FirstOrDefault(),
             Instances = instances
                 .Select(i => new ReportInstanceSummaryResponse
                 {
