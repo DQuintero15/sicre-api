@@ -77,11 +77,23 @@ public class MonthlyReportPdfGenerator
             .PaddingVertical(14)
             .Row(row =>
             {
-                // Logo Llanogas
-                row.ConstantItem(110).AlignMiddle().Element(logo =>
+                // Logos Llanogas + Cusianagas (juntos a la izquierda)
+                row.ConstantItem(100).AlignMiddle().Row(logos =>
                 {
                     if (data.LogoLlanogas != null)
-                        try { logo.MaxHeight(38).Image(data.LogoLlanogas); } catch { }
+                        logos.ConstantItem(55).AlignMiddle().Element(l =>
+                        {
+                            try { l.MaxHeight(24).Image(data.LogoLlanogas); } catch { }
+                        });
+
+                    if (data.LogoLlanogas != null && data.LogoCusianagas != null)
+                        logos.ConstantItem(8); // spacer
+
+                    if (data.LogoCusianagas != null)
+                        logos.ConstantItem(37).AlignMiddle().Element(l =>
+                        {
+                            try { l.MaxHeight(18).Image(data.LogoCusianagas); } catch { }
+                        });
                 });
 
                 // Title block
@@ -106,13 +118,6 @@ public class MonthlyReportPdfGenerator
                             .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextLight))
                             .Text(data.GeneratedAt);
                     });
-
-                // Logo Cusianagas
-                row.ConstantItem(110).AlignMiddle().AlignRight().Element(logo =>
-                {
-                    if (data.LogoCusianagas != null)
-                        try { logo.MaxHeight(38).Image(data.LogoCusianagas); } catch { }
-                });
             });
     }
 
