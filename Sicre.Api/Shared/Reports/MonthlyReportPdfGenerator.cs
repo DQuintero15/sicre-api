@@ -10,40 +10,41 @@ public class MonthlyReportPdfGenerator
     private static class P
     {
         public const string Brand = "#1d3e81";
-        public const string BrandBg = "#dbeafe";
 
+        // Status badge colors — subtle tints only
         public const string GreenText = "#15803d";
-        public const string GreenBg = "#dcfce7";
-        public const string Green = "#22c55e";
-
+        public const string GreenBg = "#f0fdf4";
         public const string OrangeText = "#c2410c";
-        public const string OrangeBg = "#ffedd5";
-        public const string Orange = "#f97316";
-
+        public const string OrangeBg = "#fff7ed";
         public const string RedText = "#b91c1c";
-        public const string RedBg = "#fee2e2";
-        public const string Red = "#ef4444";
-
+        public const string RedBg = "#fef2f2";
         public const string YellowText = "#854d0e";
-        public const string YellowBg = "#fef9c3";
-        public const string Yellow = "#eab308";
+        public const string YellowBg = "#fffbeb";
 
-        public const string TextMain = "#0f172a";
+        // Muted bar-segment colors
+        public const string BarGreen = "#86efac";
+        public const string BarOrange = "#fdba74";
+        public const string BarRed = "#fca5a5";
+        public const string BarYellow = "#fde047";
+
+        public const string TextMain = "#1e293b";
         public const string TextMuted = "#64748b";
-        public const string HeaderBg = "#f1f5f9";
-        public const string RowAlt = "#f8fafc";
+        public const string TextLight = "#94a3b8";
+        public const string TableHeaderBg = "#f1f5f9";
+        public const string RowAlt = "#fafafa";
         public const string Border = "#e2e8f0";
         public const string White = "#ffffff";
     }
 
-    private static (string text, string bg, string accent) RateColors(double rate) =>
-        rate >= 75 ? (P.GreenText, P.GreenBg, P.Green)
-        : rate >= 50 ? (P.YellowText, P.YellowBg, P.Yellow)
-        : (P.RedText, P.RedBg, P.Red);
+    private static (string text, string bg) RateColors(double rate) =>
+        rate >= 75
+            ? (P.GreenText, P.GreenBg)
+            : rate >= 50
+                ? (P.YellowText, P.YellowBg)
+                : (P.RedText, P.RedBg);
 
-    public byte[] Generate(MonthlyReportData data)
-    {
-        return Document
+    public byte[] Generate(MonthlyReportData data) =>
+        Document
             .Create(container =>
             {
                 container.Page(page =>
@@ -64,29 +65,24 @@ public class MonthlyReportPdfGenerator
                 });
             })
             .GeneratePdf();
-    }
 
     // ─── Page Header ────────────────────────────────────────────────────
 
     private static void Header(IContainer c, MonthlyReportData data)
     {
-        c.Background(P.Brand)
+        c.Background(P.White)
+            .BorderBottom(1)
+            .BorderColor(P.Border)
             .PaddingHorizontal(1.8f, Unit.Centimetre)
-            .PaddingVertical(16)
+            .PaddingVertical(14)
             .Row(row =>
             {
                 // Logo Llanogas
-                var leftLogo = row.ConstantItem(130).AlignMiddle();
-                if (data.LogoLlanogas != null)
+                row.ConstantItem(110).AlignMiddle().Element(logo =>
                 {
-                    try
-                    {
-                        leftLogo.MaxHeight(40).Image(data.LogoLlanogas);
-                    }
-                    catch
-                    { /* logo unavailable */
-                    }
-                }
+                    if (data.LogoLlanogas != null)
+                        try { logo.MaxHeight(38).Image(data.LogoLlanogas); } catch { }
+                });
 
                 // Title block
                 row.RelativeItem()
@@ -95,34 +91,28 @@ public class MonthlyReportPdfGenerator
                     {
                         col.Item()
                             .AlignCenter()
-                            .DefaultTextStyle(ts => ts.FontSize(14).Bold().FontColor(P.White))
+                            .DefaultTextStyle(ts => ts.FontSize(13).Bold().FontColor(P.Brand))
                             .Text("INFORME MENSUAL DE CUMPLIMIENTO");
 
                         col.Item()
                             .PaddingTop(3)
                             .AlignCenter()
-                            .DefaultTextStyle(ts => ts.FontSize(10).FontColor("#93c5fd"))
+                            .DefaultTextStyle(ts => ts.FontSize(9.5f).FontColor(P.TextMuted))
                             .Text(data.PeriodLabel.ToUpperInvariant());
 
                         col.Item()
-                            .PaddingTop(3)
+                            .PaddingTop(2)
                             .AlignCenter()
-                            .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor("#bfdbfe"))
+                            .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextLight))
                             .Text(data.GeneratedAt);
                     });
 
                 // Logo Cusianagas
-                var rightLogo = row.ConstantItem(100).AlignMiddle().AlignRight();
-                if (data.LogoCusianagas != null)
+                row.ConstantItem(110).AlignMiddle().AlignRight().Element(logo =>
                 {
-                    try
-                    {
-                        rightLogo.MaxHeight(36).Image(data.LogoCusianagas);
-                    }
-                    catch
-                    { /* logo unavailable */
-                    }
-                }
+                    if (data.LogoCusianagas != null)
+                        try { logo.MaxHeight(38).Image(data.LogoCusianagas); } catch { }
+                });
             });
     }
 
@@ -132,29 +122,25 @@ public class MonthlyReportPdfGenerator
     {
         c.Column(col =>
         {
-            // Resumen Ejecutivo
-            col.Item().Element(c => KpiSummary(c, data.StateDistribution));
+            col.Item().Element(c2 => KpiSummary(c2, data.StateDistribution));
 
-            // Tendencia de Cumplimiento
             if (data.Trend.Count > 0)
-                col.Item().PaddingTop(22).Element(c => TrendSection(c, data.Trend));
+                col.Item().PaddingTop(22).Element(c2 => TrendSection(c2, data.Trend));
 
-            // Por Entidad de Control
             if (data.ByEntity.Count > 0)
-                col.Item().PaddingTop(22).Element(c => EntitySection(c, data.ByEntity));
+                col.Item().PaddingTop(22).Element(c2 => EntitySection(c2, data.ByEntity));
 
-            // Por Sede
             if (data.ByBranch.Count > 0)
-                col.Item().PaddingTop(22).Element(c => BranchSection(c, data.ByBranch));
+                col.Item().PaddingTop(22).Element(c2 => BranchSection(c2, data.ByBranch));
 
-            // Por Responsable
             if (data.ByResponsible.Count > 0)
-                col.Item().PaddingTop(22).Element(c => ResponsibleSection(c, data.ByResponsible));
+                col.Item()
+                    .PaddingTop(22)
+                    .Element(c2 => ResponsibleSection(c2, data.ByResponsible));
 
-            // Nota de cierre
             col.Item()
                 .PaddingTop(28)
-                .DefaultTextStyle(ts => ts.FontSize(7.5f).Italic().FontColor(P.TextMuted))
+                .DefaultTextStyle(ts => ts.FontSize(7.5f).Italic().FontColor(P.TextLight))
                 .Text(
                     "Este informe fue generado automáticamente por SICRE · "
                         + "Los datos corresponden a las instancias registradas para el período indicado."
@@ -174,33 +160,32 @@ public class MonthlyReportPdfGenerator
                 .PaddingTop(12)
                 .Row(row =>
                 {
-                    KpiCard(row, "TOTAL", dist.Total, P.Brand, P.BrandBg, dist.Total);
-                    KpiCard(row, "A TIEMPO", dist.OnTime, P.GreenText, P.GreenBg, dist.Total);
-                    KpiCard(row, "TARDE", dist.Late, P.OrangeText, P.OrangeBg, dist.Total);
-                    KpiCard(row, "NO REPORTADO", dist.Overdue, P.RedText, P.RedBg, dist.Total);
-                    KpiCard(row, "PENDIENTE", dist.Pending, P.YellowText, P.YellowBg, dist.Total);
+                    KpiCard(row, "TOTAL", dist.Total, P.Brand, dist.Total);
+                    KpiCard(row, "A TIEMPO", dist.OnTime, P.BarGreen, dist.Total);
+                    KpiCard(row, "TARDE", dist.Late, P.BarOrange, dist.Total);
+                    KpiCard(row, "NO REPORTADO", dist.Overdue, P.BarRed, dist.Total);
+                    KpiCard(row, "PENDIENTE", dist.Pending, P.BarYellow, dist.Total);
                 });
 
-            // Visual breakdown bar
             if (dist.Total > 0)
             {
                 col.Item()
                     .PaddingTop(10)
-                    .Height(7)
+                    .Height(5)
                     .Row(r =>
                     {
                         if (dist.OnTime > 0)
-                            r.RelativeItem(dist.OnTime).Background(P.Green);
+                            r.RelativeItem(dist.OnTime).Background(P.BarGreen);
                         if (dist.Late > 0)
-                            r.RelativeItem(dist.Late).Background(P.Orange);
+                            r.RelativeItem(dist.Late).Background(P.BarOrange);
                         if (dist.Overdue > 0)
-                            r.RelativeItem(dist.Overdue).Background(P.Red);
+                            r.RelativeItem(dist.Overdue).Background(P.BarRed);
                         if (dist.Pending > 0)
-                            r.RelativeItem(dist.Pending).Background(P.Yellow);
+                            r.RelativeItem(dist.Pending).Background(P.BarYellow);
                     });
 
                 col.Item()
-                    .PaddingTop(4)
+                    .PaddingTop(5)
                     .Row(r =>
                     {
                         void Legend(string color, string label) =>
@@ -223,10 +208,10 @@ public class MonthlyReportPdfGenerator
                                         .Text(label);
                                 });
 
-                        Legend(P.Green, "A Tiempo");
-                        Legend(P.Orange, "Tarde");
-                        Legend(P.Red, "No Reportado");
-                        Legend(P.Yellow, "Pendiente");
+                        Legend(P.BarGreen, "A Tiempo");
+                        Legend(P.BarOrange, "Tarde");
+                        Legend(P.BarRed, "No Reportado");
+                        Legend(P.BarYellow, "Pendiente");
                     });
             }
         });
@@ -236,8 +221,7 @@ public class MonthlyReportPdfGenerator
         RowDescriptor row,
         string label,
         int value,
-        string color,
-        string bg,
+        string accentColor,
         int total
     )
     {
@@ -245,31 +229,31 @@ public class MonthlyReportPdfGenerator
 
         row.RelativeItem()
             .Padding(3)
+            .Border(1)
+            .BorderColor(P.Border)
             .Column(col =>
             {
-                col.Item().Height(4).Background(color);
+                col.Item().Height(3).Background(accentColor);
                 col.Item()
-                    .Background(bg)
-                    .Border(1)
-                    .BorderColor(P.Border)
+                    .Background(P.White)
                     .PaddingHorizontal(10)
                     .PaddingTop(10)
                     .PaddingBottom(12)
                     .Column(card =>
                     {
                         card.Item()
-                            .DefaultTextStyle(ts => ts.FontSize(22).Bold().FontColor(color))
+                            .DefaultTextStyle(ts => ts.FontSize(22).Bold().FontColor(P.TextMain))
                             .Text(value.ToString());
 
                         card.Item()
                             .PaddingTop(2)
-                            .DefaultTextStyle(ts => ts.FontSize(7.5f).Bold().FontColor(color))
+                            .DefaultTextStyle(ts => ts.FontSize(7f).Bold().FontColor(P.TextMuted))
                             .Text(label);
 
                         card.Item()
                             .PaddingTop(4)
-                            .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextMuted))
-                            .Text($"{pct:F1}% del total");
+                            .DefaultTextStyle(ts => ts.FontSize(7f).FontColor(P.TextLight))
+                            .Text($"{pct:F1}%");
                     });
             });
     }
@@ -287,13 +271,13 @@ public class MonthlyReportPdfGenerator
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.RelativeColumn(2.2f); // mes
-                        cols.RelativeColumn(1f); // total
-                        cols.RelativeColumn(1f); // a tiempo
-                        cols.RelativeColumn(1f); // tarde
-                        cols.RelativeColumn(1f); // no rep
-                        cols.RelativeColumn(1f); // pendiente
-                        cols.RelativeColumn(1.3f); // % cumpl
+                        cols.RelativeColumn(2.2f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1.3f);
                     });
 
                     table.Header(h =>
@@ -314,46 +298,15 @@ public class MonthlyReportPdfGenerator
                     {
                         var bg = alt ? P.RowAlt : P.White;
                         alt = !alt;
-                        var (rateText, _, _) = RateColors(t.OnTimePercentage);
+                        var (rateText, rateBg) = RateColors(t.OnTimePercentage);
 
                         DataCell(table.Cell(), bg, t.Month);
                         DataCell(table.Cell(), bg, t.Total.ToString(), center: true);
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            t.OnTime.ToString(),
-                            center: true,
-                            color: P.GreenText
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            t.Late.ToString(),
-                            center: true,
-                            color: t.Late > 0 ? P.OrangeText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            t.Overdue.ToString(),
-                            center: true,
-                            color: t.Overdue > 0 ? P.RedText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            t.Pending.ToString(),
-                            center: true,
-                            color: t.Pending > 0 ? P.YellowText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            $"{t.OnTimePercentage:F1}%",
-                            center: true,
-                            color: rateText,
-                            bold: true
-                        );
+                        DataCell(table.Cell(), bg, t.OnTime.ToString(), center: true);
+                        DataCell(table.Cell(), bg, t.Late.ToString(), center: true);
+                        DataCell(table.Cell(), bg, t.Overdue.ToString(), center: true);
+                        DataCell(table.Cell(), bg, t.Pending.ToString(), center: true);
+                        RateBadgeCell(table.Cell(), bg, $"{t.OnTimePercentage:F1}%", rateText, rateBg);
                     }
                 });
         });
@@ -372,14 +325,14 @@ public class MonthlyReportPdfGenerator
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.ConstantColumn(22); // #
-                        cols.RelativeColumn(3f); // entidad
-                        cols.RelativeColumn(1f); // total
-                        cols.RelativeColumn(1f); // a tiempo
-                        cols.RelativeColumn(1f); // tarde
-                        cols.RelativeColumn(1f); // no rep
-                        cols.RelativeColumn(1f); // pendiente
-                        cols.RelativeColumn(1.3f); // % cumpl
+                        cols.ConstantColumn(22);
+                        cols.RelativeColumn(3f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1f);
+                        cols.RelativeColumn(1.3f);
                     });
 
                     table.Header(h =>
@@ -402,47 +355,16 @@ public class MonthlyReportPdfGenerator
                     {
                         var bg = alt ? P.RowAlt : P.White;
                         alt = !alt;
-                        var (rateText, _, _) = RateColors(item.OnTimeRate);
+                        var (rateText, rateBg) = RateColors(item.OnTimeRate);
 
                         DataCell(table.Cell(), bg, i++.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.EntityName, bold: true);
                         DataCell(table.Cell(), bg, item.Total.ToString(), center: true);
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.OnTime.ToString(),
-                            center: true,
-                            color: P.GreenText
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Late.ToString(),
-                            center: true,
-                            color: item.Late > 0 ? P.OrangeText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Overdue.ToString(),
-                            center: true,
-                            color: item.Overdue > 0 ? P.RedText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Pending.ToString(),
-                            center: true,
-                            color: item.Pending > 0 ? P.YellowText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            $"{item.OnTimeRate:F1}%",
-                            center: true,
-                            color: rateText,
-                            bold: true
-                        );
+                        DataCell(table.Cell(), bg, item.OnTime.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Late.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Pending.ToString(), center: true);
+                        RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
                     }
                 });
         });
@@ -489,40 +411,15 @@ public class MonthlyReportPdfGenerator
                     {
                         var bg = alt ? P.RowAlt : P.White;
                         alt = !alt;
-                        var (rateText, _, _) = RateColors(item.OnTimeRate);
+                        var (rateText, rateBg) = RateColors(item.OnTimeRate);
 
                         DataCell(table.Cell(), bg, i++.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.BranchName, bold: true);
                         DataCell(table.Cell(), bg, item.Total.ToString(), center: true);
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.OnTime.ToString(),
-                            center: true,
-                            color: P.GreenText
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Late.ToString(),
-                            center: true,
-                            color: item.Late > 0 ? P.OrangeText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Overdue.ToString(),
-                            center: true,
-                            color: item.Overdue > 0 ? P.RedText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            $"{item.OnTimeRate:F1}%",
-                            center: true,
-                            color: rateText,
-                            bold: true
-                        );
+                        DataCell(table.Cell(), bg, item.OnTime.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Late.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
+                        RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
                     }
                 });
         });
@@ -575,40 +472,15 @@ public class MonthlyReportPdfGenerator
                     {
                         var bg = alt ? P.RowAlt : P.White;
                         alt = !alt;
-                        var (rateText, _, _) = RateColors(item.OnTimeRate);
+                        var (rateText, rateBg) = RateColors(item.OnTimeRate);
 
                         DataCell(table.Cell(), bg, i++.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.ResponsibleName, bold: true);
                         DataCell(table.Cell(), bg, item.Total.ToString(), center: true);
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.OnTime.ToString(),
-                            center: true,
-                            color: P.GreenText
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Late.ToString(),
-                            center: true,
-                            color: item.Late > 0 ? P.OrangeText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            item.Overdue.ToString(),
-                            center: true,
-                            color: item.Overdue > 0 ? P.RedText : null
-                        );
-                        DataCell(
-                            table.Cell(),
-                            bg,
-                            $"{item.OnTimeRate:F1}%",
-                            center: true,
-                            color: rateText,
-                            bold: true
-                        );
+                        DataCell(table.Cell(), bg, item.OnTime.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Late.ToString(), center: true);
+                        DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
+                        RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
                     }
                 });
         });
@@ -624,14 +496,14 @@ public class MonthlyReportPdfGenerator
             .Row(row =>
             {
                 row.RelativeItem()
-                    .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextMuted))
+                    .DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextLight))
                     .Text("SICRE · Sistema de Consolidación y Reporte a Entidades");
 
                 row.ConstantItem(70)
                     .AlignRight()
                     .Text(t =>
                     {
-                        t.DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextMuted));
+                        t.DefaultTextStyle(ts => ts.FontSize(7.5f).FontColor(P.TextLight));
                         t.Span("Página ");
                         t.CurrentPageNumber();
                         t.Span(" de ");
@@ -646,11 +518,11 @@ public class MonthlyReportPdfGenerator
         c =>
             c.Row(row =>
             {
-                row.ConstantItem(4).Background(P.Brand);
+                row.ConstantItem(3).Background(P.Brand);
                 row.RelativeItem()
                     .PaddingLeft(8)
-                    .PaddingVertical(6)
-                    .DefaultTextStyle(ts => ts.FontSize(10.5f).Bold().FontColor(P.Brand))
+                    .PaddingVertical(5)
+                    .DefaultTextStyle(ts => ts.FontSize(10f).Bold().FontColor(P.Brand))
                     .Text(title);
             });
 
@@ -659,10 +531,12 @@ public class MonthlyReportPdfGenerator
         foreach (var col in columns)
         {
             h.Cell()
-                .Background(P.Brand)
+                .Background(P.TableHeaderBg)
+                .BorderBottom(2)
+                .BorderColor(P.Brand)
                 .PaddingHorizontal(6)
                 .PaddingVertical(7)
-                .DefaultTextStyle(ts => ts.FontSize(7.5f).Bold().FontColor(P.White))
+                .DefaultTextStyle(ts => ts.FontSize(7.5f).SemiBold().FontColor(P.TextMain))
                 .Text(col);
         }
     }
@@ -672,7 +546,6 @@ public class MonthlyReportPdfGenerator
         string bg,
         string text,
         bool center = false,
-        string? color = null,
         bool bold = false
     )
     {
@@ -687,13 +560,37 @@ public class MonthlyReportPdfGenerator
 
         c.DefaultTextStyle(ts =>
             {
-                ts = ts.FontSize(8.5f);
-                if (color != null)
-                    ts = ts.FontColor(color);
+                ts = ts.FontSize(8.5f).FontColor(P.TextMain);
                 if (bold)
                     ts = ts.SemiBold();
                 return ts;
             })
             .Text(text);
+    }
+
+    private static void RateBadgeCell(
+        IContainer cell,
+        string rowBg,
+        string text,
+        string textColor,
+        string badgeBg
+    )
+    {
+        cell.Background(rowBg)
+            .BorderBottom(1)
+            .BorderColor(P.Border)
+            .PaddingHorizontal(4)
+            .PaddingVertical(4)
+            .AlignCenter()
+            .AlignMiddle()
+            .Background(rowBg)
+            .Element(inner =>
+                inner
+                    .Background(badgeBg)
+                    .PaddingHorizontal(6)
+                    .PaddingVertical(2)
+                    .DefaultTextStyle(ts => ts.FontSize(8f).SemiBold().FontColor(textColor))
+                    .Text(text)
+            );
     }
 }

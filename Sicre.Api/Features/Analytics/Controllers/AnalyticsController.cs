@@ -6,6 +6,7 @@ using Sicre.Api.Features.Analytics.Services;
 using Sicre.Api.Features.Auth.Controllers;
 using Sicre.Api.Infrastructure.Attributes;
 using Sicre.Api.Shared;
+using Sicre.Api.Shared.Reports;
 
 namespace Sicre.Api.Features.Analytics.Controllers;
 
@@ -13,7 +14,11 @@ namespace Sicre.Api.Features.Analytics.Controllers;
 [Route("api/analytics")]
 [Authorize]
 [RequireTokenType(Constants.TokenTypes.AccessToken)]
-public class AnalyticsController(IAnalyticsService analyticsService) : BaseController
+public class AnalyticsController(
+    IAnalyticsService analyticsService,
+    MonthlyReportPdfGenerator pdfGenerator,
+    IWebHostEnvironment env
+) : BaseController
 {
     [HttpGet("state-distribution")]
     public async Task<ActionResult<ApiResponse<StateDistributionDto>>> GetStateDistribution(
@@ -108,6 +113,63 @@ public class AnalyticsController(IAnalyticsService analyticsService) : BaseContr
             filter
         );
         return FromResult(result);
+    }
+
+    [HttpGet("export-pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportPdf([FromQuery] AnalyticsFilterRequest filter)
+    {
+        var userId = GetUserId();
+        var userRoles = GetUserRoles() ?? [];
+
+        var (distTask, trendTask, entityTask, responsibleTask, branchTask) = (
+            analyticsService.GetStateDistributionAsync(userId, userRoles, filter),
+            analyticsService.GetComplianceTrendAsync(userId, userRoles, filter),
+            analyticsService.GetComplianceByEntityAsync(userId, userRoles, filter),
+            analyticsService.GetComplianceByResponsibleAsync(userId, userRoles, filter),
+            analyticsService.GetComplianceByBranchAsync(userId, userRoles, filter)
+        );
+
+        await Task.WhenAll(distTask, trendTask, entityTask, responsibleTask, branchTask);
+
+        var dist = distTask.Result.Data ?? new StateDistributionDto();
+        var trend = trendTask.Result.Data ?? [];
+        var entities = entityTask.Result.Data ?? [];
+        var responsible = responsibleTask.Result.Data ?? [];
+        var branches = branchTask.Result.Data ?? [];
+
+        var now = DateTime.UtcNow;
+        var dateRangeLabel = filter.StartDate.HasValue && filter.EndDate.HasValue
+            ? $"{filter.StartDate:dd/MM/yyyy} - {filter.EndDate:dd/MM/yyyy}"
+            : filter.StartDate.HasValue
+                ? $"Desde {filter.StartDate:dd/MM/yyyy}"
+                : filter.EndDate.HasValue
+                    ? $"Hasta {filter.EndDate:dd/MM/yyyy}"
+                    : "Reporte General";
+
+        var reportData = new MonthlyReportData
+        {
+            PeriodLabel = $"Analitica de Reportes — {dateRangeLabel}",
+            PeriodYear = now.Year,
+            PeriodMonth = now.Month,
+            GeneratedAt = $"Generado el {now:dd/MM/yyyy HH:mm}",
+            StateDistribution = dist,
+            Trend = trend,
+            ByEntity = entities,
+            ByResponsible = responsible,
+            ByBranch = branches,
+            LogoLlanogas = TryReadLogoFile(Path.Combine(env.ContentRootPath, "Assets", "Images", "logo-llanogas.webp")),
+            LogoCusianagas = TryReadLogoFile(Path.Combine(env.ContentRootPath, "Assets", "Images", "logo-cusianogas.webp")),
+        };
+
+        var pdfBytes = pdfGenerator.Generate(reportData);
+        return File(pdfBytes, "application/pdf", $"analitica-sicre-{now:yyyy-MM-dd}.pdf");
+    }
+
+    private static byte[]? TryReadLogoFile(string path)
+    {
+        try { return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null; }
+        catch { return null; }
     }
 
     private List<string> GetUserRoles() =>
