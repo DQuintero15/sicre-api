@@ -20,49 +20,39 @@ internal static class ReportEmailTemplates
         var color = alertType switch
         {
             "Alerta Temprana" => "#17a2b8",
-            "Seguimiento" => "#ffc107",
-            "Crítica" => "#dc3545",
-            _ => "#6c757d",
+            "Seguimiento" => "#d97706",
+            "Critica" => "#dc2626",
+            _ => "#6b7280",
         };
 
         var branchRow = string.IsNullOrWhiteSpace(branchName)
             ? ""
-            : $"<p style='margin:5px 0;font-size:14px;'><strong>Sede:</strong> {branchName}</p>";
+            : $"<span style=\"color:#6b7280;font-size:13px;\"> | Sede: {branchName}</span>";
 
-        return $"""
-            <html lang='es'>
-            <body style='margin:0;padding:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background-color:#f5f5f5;'>
-                <table width='100%' cellpadding='0' cellspacing='0' style='padding:40px 20px;'>
-                    <tr><td align='center'>
-                        <table width='600' cellpadding='0' cellspacing='0' style='background-color:#fff;border-radius:10px;box-shadow:0 3px 6px rgba(0,0,0,0.1);'>
-                            <tr><td style='text-align:center;padding:30px;'>
-                                <h2 style='color:#1d1d1d;margin:0 0 10px;font-weight:600;'>Recordatorio de Reporte</h2>
-                                <span style='background-color:{color};color:#fff;padding:5px 10px;border-radius:15px;font-size:12px;font-weight:bold;'>{alertType}</span>
-                            </td></tr>
-                            <tr><td style='padding:30px;'>
-                                <p style='color:#333;font-size:15px;margin-bottom:20px;'>Hola <strong>{userName}</strong>,</p>
-                                <p style='color:#333;font-size:15px;margin-bottom:20px;'>
-                                    Este es un recordatorio para el reporte <strong>{reportName}</strong> correspondiente al periodo <strong>{periodName}</strong>.
-                                </p>
-                                <div style='background-color:#f8f9fa;border-left:4px solid {color};padding:15px;margin-bottom:25px;'>
-                                    {branchRow}
-                                    <p style='margin:5px 0;font-size:14px;'><strong>Fecha de Vencimiento:</strong> {dueDate:dd/MM/yyyy}</p>
-                                    <p style='margin:5px 0;font-size:14px;'><strong>{(
-                isOverdue ? "Días de atraso" : "Días Restantes"
-            )}:</strong> {daysRemaining}</p>
-                                </div>
-                                <p style='color:#555;font-size:14px;margin-bottom:30px;'>Por favor asegúrese de gestionar este reporte antes de la fecha límite.</p>
-                                <div style='text-align:center;'>
-                                    <a href='{frontendUrl}' style='background:#1d3e81;color:#fff;text-decoration:none;padding:12px 40px;border-radius:6px;font-weight:600;display:inline-block;'>Ir a la plataforma</a>
-                                </div>
-                            </td></tr>
-                            <tr><td style='background-color:#f5f5f5;padding:20px;text-align:center;font-size:12px;color:#888;'>© 2025 Grupo del Llano. Todos los derechos reservados.</td></tr>
-                        </table>
-                    </td></tr>
-                </table>
-            </body>
-            </html>
-            """;
+        return EmailLayout.Wrap($$"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+              <tr>
+                <td style="background-color:{{color}};padding:4px 12px;border-radius:4px;">
+                  <p style="margin:0;color:#ffffff;font-size:11px;font-weight:600;letter-spacing:0.5px;">{{alertType}}</p>
+                </td>
+              </tr>
+            </table>
+            <h2 style="color:#111827;margin:0 0 20px;font-weight:600;font-size:18px;">Recordatorio de Reporte</h2>
+            <p style="color:#4b5563;font-size:14px;margin:0 0 16px;line-height:1.6;">Hola <strong>{{userName}}</strong>,</p>
+            <p style="color:#4b5563;font-size:14px;margin:0 0 16px;line-height:1.6;">
+              Este es un recordatorio para el reporte <strong>{{reportName}}</strong> correspondiente al periodo <strong>{{periodName}}</strong>.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;margin:0 0 24px;">
+              <tr>
+                <td style="padding:12px 16px;font-size:13px;color:#4b5563;"><strong>Fecha de vencimiento:</strong> {{dueDate:dd/MM/yyyy}}{{branchRow}}</td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 12px;font-size:13px;color:#4b5563;"><strong>{{(isOverdue ? "Dias de atraso" : "Dias restantes")}}:</strong> {{daysRemaining}}</td>
+              </tr>
+            </table>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 28px;">Por favor asegurese de gestionar este reporte antes de la fecha limite.</p>
+            <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:12px 40px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ir a la plataforma</a>
+            """);
     }
 
     internal static string ReportAlertNotification(
@@ -81,54 +71,47 @@ internal static class ReportEmailTemplates
     {
         var (color, label) = alertType switch
         {
-            "Preventiva" => ("#28a745", "Preventiva"),
-            "Seguimiento" => ("#ffc107", "Seguimiento"),
-            "Riesgo" => ("#fd7e14", "Riesgo"),
-            "Crítica" => ("#dc3545", "Crítica"),
-            _ => ("#6c757d", alertType),
+            "Preventiva" => ("#16a34a", "Preventiva"),
+            "Seguimiento" => ("#d97706", "Seguimiento"),
+            "Riesgo" => ("#ea580c", "Riesgo"),
+            "Critica" => ("#dc2626", "Critica"),
+            _ => ("#6b7280", alertType),
         };
 
         var branchRow = string.IsNullOrWhiteSpace(branchName)
             ? ""
-            : $"<p style='margin:4px 0;font-size:14px;'><strong>Sede:</strong> {branchName}</p>";
+            : $"<span style=\"color:#6b7280;font-size:13px;\"> | Sede: {branchName}</span>";
 
         var instanceUrl = $"{frontendUrl}/report-instances/{instanceId}";
         var pixelUrl = $"{backendUrl}/api/notifications/{notificationId}/mark-as-read";
 
-        return $"""
-            <html lang='es'>
-            <body style='margin:0;padding:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background-color:#f5f5f5;'>
-                <table width='100%' cellpadding='0' cellspacing='0' style='padding:40px 20px;'>
-                    <tr><td align='center'>
-                        <table width='600' cellpadding='0' cellspacing='0' style='background-color:#fff;border-radius:10px;box-shadow:0 3px 6px rgba(0,0,0,0.1);'>
-                            <tr><td style='background-color:{color};padding:4px 0;border-radius:10px 10px 0 0;'></td></tr>
-                            <tr><td style='text-align:center;padding:28px 30px 16px;'>
-                                <span style='background-color:{color};color:#fff;padding:5px 14px;border-radius:15px;font-size:12px;font-weight:700;letter-spacing:.5px;'>{label}</span>
-                                <h2 style='color:#1d1d1d;margin:14px 0 0;font-weight:600;font-size:18px;'>Alerta de Reporte</h2>
-                            </td></tr>
-                            <tr><td style='padding:10px 30px 30px;'>
-                                <p style='color:#333;font-size:15px;margin:0 0 18px;'>Hola <strong>{userName}</strong>,</p>
-                                <div style='background-color:#f8f9fa;border-left:4px solid {color};padding:14px 16px;margin-bottom:22px;border-radius:0 6px 6px 0;'>
-                                    <p style='margin:0;font-size:15px;color:#333;line-height:1.6;'>{alertMessage}</p>
-                                </div>
-                                <div style='border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;margin-bottom:24px;'>
-                                    <p style='margin:4px 0;font-size:14px;'><strong>Reporte:</strong> {reportName}</p>
-                                    <p style='margin:4px 0;font-size:14px;'><strong>Período:</strong> {periodName}</p>
-                                    <p style='margin:4px 0;font-size:14px;'><strong>Fecha de vencimiento:</strong> {dueDate:dd/MM/yyyy}</p>
-                                    {branchRow}
-                                </div>
-                                <div style='text-align:center;'>
-                                    <a href='{instanceUrl}' style='background:#1d3e81;color:#fff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;'>Ver reporte en SICRE</a>
-                                </div>
-                            </td></tr>
-                            <tr><td style='background-color:#f5f5f5;padding:18px;text-align:center;font-size:12px;color:#888;border-radius:0 0 10px 10px;'>© 2025 Grupo del Llano. Todos los derechos reservados.</td></tr>
-                        </table>
-                    </td></tr>
-                </table>
-                <img src='{pixelUrl}' width='1' height='1' alt='' style='display:none;' />
-            </body>
-            </html>
-            """;
+        return EmailLayout.Wrap($$"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+              <tr>
+                <td style="background-color:{{color}};padding:4px 12px;border-radius:4px;">
+                  <p style="margin:0;color:#ffffff;font-size:11px;font-weight:600;letter-spacing:0.5px;">{{label}}</p>
+                </td>
+              </tr>
+            </table>
+            <h2 style="color:#111827;margin:0 0 20px;font-weight:600;font-size:18px;">Alerta de Reporte</h2>
+            <p style="color:#4b5563;font-size:14px;margin:0 0 16px;line-height:1.6;">Hola <strong>{{userName}}</strong>,</p>
+            <div style="background-color:#f9fafb;padding:14px 16px;margin:0 0 20px;">
+              <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">{{alertMessage}}</p>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;margin:0 0 24px;">
+              <tr>
+                <td style="padding:12px 16px;font-size:13px;color:#4b5563;"><strong>Reporte:</strong> {{reportName}}</td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px;font-size:13px;color:#4b5563;"><strong>Periodo:</strong> {{periodName}}</td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 12px;font-size:13px;color:#4b5563;"><strong>Vencimiento:</strong> {{dueDate:dd/MM/yyyy}}{{branchRow}}</td>
+              </tr>
+            </table>
+            <a href="{{instanceUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:11px 38px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Ver reporte en SICRE</a>
+            <img src="{{pixelUrl}}" width="1" height="1" alt="" style="display:none;" />
+            """);
     }
 
     internal static string ReportsAssigned(
@@ -144,17 +127,16 @@ internal static class ReportEmailTemplates
             {
                 var (color, label) = i.Status switch
                 {
-                    ReportStatus.Pending => ("#f1c40f", "Pendiente"),
-                    ReportStatus.Overdue => ("#c10015", "Vencido"),
-                    _ => ("#6C757D", "Desconocido"),
+                    ReportStatus.Pending => ("#d97706", "Pendiente"),
+                    ReportStatus.Overdue => ("#dc2626", "Vencido"),
+                    _ => ("#6b7280", "Desconocido"),
                 };
                 return $"""
-                <tr style='border-bottom:1px solid #e0e0e0;'>
-                    <td style='padding:12px;font-size:13px;color:#333;'>{i.PeriodName}</td>
-                    <td style='padding:12px;font-size:13px;color:#333;text-align:center;'>{i.DueDate:dd/MM/yyyy}</td>
-                    <td style='padding:12px;font-size:13px;color:#333;text-align:center;'>{i.PeriodStart:dd/MM/yyyy} - {i.PeriodEnd:dd/MM/yyyy}</td>
-                    <td style='padding:12px;text-align:center;'>
-                        <span style='display:inline-block;padding:6px 12px;background-color:{color};color:#fff;border-radius:12px;font-size:12px;font-weight:600;'>{label}</span>
+                <tr>
+                    <td style="padding:10px 8px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">{i.PeriodName}</td>
+                    <td style="padding:10px 8px;font-size:13px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">{i.DueDate:dd/MM/yyyy}</td>
+                    <td style="padding:10px 8px;text-align:center;border-bottom:1px solid #f3f4f6;">
+                        <span style="display:inline-block;background-color:{color};color:#ffffff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;">{label}</span>
                     </td>
                 </tr>
                 """;
@@ -163,51 +145,37 @@ internal static class ReportEmailTemplates
 
         var branchSection = string.IsNullOrWhiteSpace(data.BranchName)
             ? ""
-            : $"<p style='color:#333;font-size:13px;margin:0 0 5px;font-weight:600;'>Sede:</p><p style='color:#333;font-size:14px;margin:0 0 25px;'>{data.BranchName}</p>";
+            : $"<p style=\"color:#374151;font-size:13px;margin:0 0 4px;\"><strong>Sede:</strong> {data.BranchName}</p>";
 
-        return $"""
-            <html lang='es'>
-            <body style='margin:0;padding:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background-color:#f5f5f5;'>
-                <table width='100%' cellpadding='0' cellspacing='0' style='padding:40px 20px;'>
-                    <tr><td align='center'>
-                        <table width='650' cellpadding='0' cellspacing='0' style='background-color:#fff;border-radius:8px;'>
-                            <tr><td style='text-align:center;padding:30px;'>
-                                <h2 style='color:#1d1d1d;margin:0 0 20px;font-weight:600;font-size:22px;'>Reportes Asignados</h2>
-                            </td></tr>
-                            <tr><td style='padding:30px;'>
-                                <p style='color:#333;font-size:15px;margin:0 0 15px;'>Hola <strong>{data.UserName}</strong>,</p>
-                                <p style='color:#555;font-size:14px;margin:0 0 20px;'>
-                                    Te han asignado <strong>{data.TotalReports}</strong> reporte(s) con <strong>{data.TotalInstances}</strong> obligación(es) como <strong>{data.Role}</strong>.
-                                </p>
-                                <p style='color:#333;font-size:13px;margin:15px 0 5px;font-weight:600;'>Entidad de Control:</p>
-                                <p style='color:#333;font-size:14px;margin:0 0 15px;'>{data.ControlEntityAbbreviation} - {data.ControlEntityName}</p>
-                                <p style='color:#333;font-size:13px;margin:15px 0 5px;font-weight:600;'>Reporte:</p>
-                                <p style='color:#333;font-size:14px;margin:0 0 5px;'><strong>{data.ReportCode}</strong> - {data.ReportName}</p>
-                                {branchSection}
-                                <p style='color:#333;font-size:14px;margin:0 0 15px;font-weight:600;'>Obligaciones:</p>
-                                <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse;'>
-                                    <thead>
-                                        <tr style='background-color:#f5f5f5;border-bottom:2px solid #ddd;'>
-                                            <th style='padding:12px;text-align:left;font-size:13px;color:#333;font-weight:600;'>Período</th>
-                                            <th style='padding:12px;text-align:center;font-size:13px;color:#333;font-weight:600;'>Vencimiento</th>
-                                            <th style='padding:12px;text-align:center;font-size:13px;color:#333;font-weight:600;'>Rango Período</th>
-                                            <th style='padding:12px;text-align:center;font-size:13px;color:#333;font-weight:600;'>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>{rows}</tbody>
-                                </table>
-                                <p style='color:#555;font-size:12px;margin:25px 0 20px;text-align:center;'>Para más información, accede a la plataforma:</p>
-                                <div style='text-align:center;'>
-                                    <a href='{frontendUrl}' style='background:#333;color:#fff;text-decoration:none;padding:10px 30px;border-radius:4px;font-weight:600;display:inline-block;font-size:14px;'>Acceder a SICRE</a>
-                                </div>
-                            </td></tr>
-                            <tr><td style='background-color:#f5f5f5;padding:20px;text-align:center;font-size:12px;color:#888;border-top:1px solid #e0e0e0;'>© 2025 Grupo del Llano. Todos los derechos reservados.</td></tr>
-                        </table>
-                    </td></tr>
-                </table>
-                <img src='{backendUrl}/api/notification/{notificationId}/mark-as-read' width='1' height='1' alt='' style='display:none;' />
-            </body>
-            </html>
-            """;
+        return EmailLayout.Wrap($$"""
+            <h2 style="color:#111827;margin:0 0 20px;font-weight:600;font-size:18px;">Reportes Asignados</h2>
+            <p style="color:#4b5563;font-size:14px;margin:0 0 16px;line-height:1.6;">Hola <strong>{{data.UserName}}</strong>,</p>
+            <p style="color:#4b5563;font-size:14px;margin:0 0 20px;line-height:1.6;">
+              Te han asignado <strong>{{data.TotalReports}}</strong> reporte(s) con <strong>{{data.TotalInstances}}</strong> obligacion(es) como <strong>{{data.Role}}</strong>.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;margin:0 0 16px;">
+              <tr>
+                <td style="padding:12px 16px;font-size:13px;color:#374151;"><strong>Entidad:</strong> {{data.ControlEntityAbbreviation}} - {{data.ControlEntityName}}</td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 12px;font-size:13px;color:#374151;"><strong>Reporte:</strong> {{data.ReportCode}} - {{data.ReportName}}</td>
+              </tr>
+            </table>
+            {{branchSection}}
+            <p style="color:#374151;font-size:13px;margin:0 0 8px;font-weight:500;">Obligaciones:</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <thead>
+                <tr style="background-color:#f9fafb;">
+                  <th style="padding:10px 8px;text-align:left;font-size:12px;color:#6b7280;font-weight:500;">Periodo</th>
+                  <th style="padding:10px 8px;text-align:center;font-size:12px;color:#6b7280;font-weight:500;">Vencimiento</th>
+                  <th style="padding:10px 8px;text-align:center;font-size:12px;color:#6b7280;font-weight:500;">Estado</th>
+                </tr>
+              </thead>
+              <tbody>{{rows}}</tbody>
+            </table>
+            <p style="color:#6b7280;font-size:13px;margin:0 0 20px;">Para mas informacion, accede a la plataforma:</p>
+            <a href="{{frontendUrl}}" style="background:#1d3e81;color:#ffffff;text-decoration:none;padding:10px 30px;border-radius:6px;font-weight:600;display:inline-block;font-size:14px;">Acceder a SICRE</a>
+            <img src="{{backendUrl}}/api/notification/{{notificationId}}/mark-as-read" width="1" height="1" alt="" style="display:none;" />
+            """);
     }
 }
