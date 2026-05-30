@@ -229,6 +229,9 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Initialize email layout with logo images (inline base64)
+Sicre.Api.Shared.Email.Templates.EmailLayout.Initialize(app.Environment.ContentRootPath);
+
 // Migrate and seed
 using (var scope = app.Services.CreateScope())
 {

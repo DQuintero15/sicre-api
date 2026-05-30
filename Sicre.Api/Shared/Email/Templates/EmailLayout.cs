@@ -2,29 +2,76 @@ namespace Sicre.Api.Shared.Email.Templates;
 
 internal static class EmailLayout
 {
-    internal static string Wrap(string bodyHtml, string backendUrl)
-    {
-        var llanogasUrl = $"{backendUrl.TrimEnd('/')}/api/assets/images/logo-llanogas.webp";
-        var cusianagasUrl = $"{backendUrl.TrimEnd('/')}/api/assets/images/logo-cusianagas.webp";
+    private static string? _llanogasBase64;
+    private static string? _cusianagasBase64;
+    private static bool _initialized;
 
-        var logos = $"""
-            <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;">
-              <tr>
-                <td align="center">
-                  <table cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:0 8px 0 0;vertical-align:middle;">
-                        <img src="{llanogasUrl}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
-                      </td>
-                      <td style="padding:0 0 0 8px;vertical-align:middle;">
-                        <img src="{cusianagasUrl}" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;" />
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-            """;
+    internal static void Initialize(string contentRootPath)
+    {
+        if (_initialized) return;
+        _initialized = true;
+
+        try
+        {
+            var llanogasPath = Path.Combine(contentRootPath, "Assets", "Images", "logo-llanogas.webp");
+            var cusianagasPath = Path.Combine(contentRootPath, "Assets", "Images", "logo-cusianagas.webp");
+
+            if (File.Exists(llanogasPath))
+                _llanogasBase64 = Convert.ToBase64String(File.ReadAllBytes(llanogasPath));
+
+            if (File.Exists(cusianagasPath))
+                _cusianagasBase64 = Convert.ToBase64String(File.ReadAllBytes(cusianagasPath));
+        }
+        catch
+        {
+            // Logos are optional
+        }
+    }
+
+    internal static string Wrap(string bodyHtml)
+    {
+        var hasLlanogas = !string.IsNullOrEmpty(_llanogasBase64);
+        var hasCusianagas = !string.IsNullOrEmpty(_cusianagasBase64);
+
+        string logosHtml;
+
+        if (hasLlanogas && hasCusianagas)
+        {
+            logosHtml = $"""
+                <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;">
+                  <tr>
+                    <td align="center">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="padding:0 8px 0 0;vertical-align:middle;">
+                            <img src="data:image/webp;base64,{_llanogasBase64}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
+                          </td>
+                          <td style="padding:0 0 0 8px;vertical-align:middle;">
+                            <img src="data:image/webp;base64,{_cusianagasBase64}" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;" />
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+                """;
+        }
+        else if (hasLlanogas)
+        {
+            logosHtml = $"""
+                <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;">
+                  <tr>
+                    <td align="center">
+                      <img src="data:image/webp;base64,{_llanogasBase64}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
+                    </td>
+                  </tr>
+                </table>
+                """;
+        }
+        else
+        {
+            logosHtml = "";
+        }
 
         return $"""
             <html lang="es">
@@ -38,7 +85,7 @@ internal static class EmailLayout
                   <td align="center">
                     <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
 
-                      {logos}
+                      {logosHtml}
 
                       <tr>
                         <td style="padding:0 0 20px;">
