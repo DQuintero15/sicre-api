@@ -18,4 +18,7 @@ public enum AttachmentType
 
     [Display(Name = "Otro")]
     Other = 5,
+
+    [Display(Name = "Documento de soporte")]
+    SupportingDocument = 6,
 }
