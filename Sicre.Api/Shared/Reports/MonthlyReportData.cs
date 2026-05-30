@@ -13,6 +13,7 @@ public sealed class MonthlyReportData
     public required List<EntityComplianceDto> ByEntity { get; init; }
     public required List<ResponsibleComplianceDto> ByResponsible { get; init; }
     public required List<BranchComplianceDto> ByBranch { get; init; }
+    public required List<ReversionSummaryDto> Reversions { get; init; }
     public byte[]? LogoLlanogas { get; init; }
     public byte[]? LogoCusianagas { get; init; }
 }

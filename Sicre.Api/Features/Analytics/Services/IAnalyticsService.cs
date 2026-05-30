@@ -41,4 +41,10 @@ public interface IAnalyticsService
         IList<string> userRoles,
         AnalyticsFilterRequest filter
     );
+
+    Task<ApiResponse<List<ReversionSummaryDto>>> GetReversionsByPeriodAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    );
 }

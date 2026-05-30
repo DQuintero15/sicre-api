@@ -63,21 +63,60 @@ public class MonthlyReportJobService(
 
             var systemId = Guid.Empty;
 
-            var (distTask, trendTask, entityTask, responsibleTask, branchTask) = (
-                analyticsService.GetStateDistributionAsync(systemId, AdminRoles, monthFilter),
-                analyticsService.GetComplianceTrendAsync(systemId, AdminRoles, trendFilter),
-                analyticsService.GetComplianceByEntityAsync(systemId, AdminRoles, monthFilter),
-                analyticsService.GetComplianceByResponsibleAsync(systemId, AdminRoles, monthFilter),
-                analyticsService.GetComplianceByBranchAsync(systemId, AdminRoles, monthFilter)
-            );
-
-            await Task.WhenAll(distTask, trendTask, entityTask, responsibleTask, branchTask);
-
-            var dist = distTask.Result.Data ?? new StateDistributionDto();
-            var trend = trendTask.Result.Data ?? [];
-            var entities = entityTask.Result.Data ?? [];
-            var responsible = responsibleTask.Result.Data ?? [];
-            var branches = branchTask.Result.Data ?? [];
+            var dist =
+                (
+                    await analyticsService.GetStateDistributionAsync(
+                        systemId,
+                        AdminRoles,
+                        monthFilter
+                    )
+                ).Data
+                ?? new StateDistributionDto();
+            var trend =
+                (
+                    await analyticsService.GetComplianceTrendAsync(
+                        systemId,
+                        AdminRoles,
+                        trendFilter
+                    )
+                ).Data
+                ?? [];
+            var entities =
+                (
+                    await analyticsService.GetComplianceByEntityAsync(
+                        systemId,
+                        AdminRoles,
+                        monthFilter
+                    )
+                ).Data
+                ?? [];
+            var responsible =
+                (
+                    await analyticsService.GetComplianceByResponsibleAsync(
+                        systemId,
+                        AdminRoles,
+                        monthFilter
+                    )
+                ).Data
+                ?? [];
+            var branches =
+                (
+                    await analyticsService.GetComplianceByBranchAsync(
+                        systemId,
+                        AdminRoles,
+                        monthFilter
+                    )
+                ).Data
+                ?? [];
+            var reversions =
+                (
+                    await analyticsService.GetReversionsByPeriodAsync(
+                        systemId,
+                        AdminRoles,
+                        monthFilter
+                    )
+                ).Data
+                ?? [];
 
             // ─── Load logos ───────────────────────────────────────────
             var assetsPath = Path.Combine(env.ContentRootPath, "Assets", "Images");
@@ -98,6 +137,7 @@ public class MonthlyReportJobService(
                 ByEntity = entities,
                 ByResponsible = responsible,
                 ByBranch = branches,
+                Reversions = reversions,
                 LogoLlanogas = logoLlanogas,
                 LogoCusianagas = logoCusianagas,
             };

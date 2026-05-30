@@ -152,6 +152,11 @@ public class MonthlyReportPdfGenerator
                 col.Item().PaddingTop(22).Element(c2 => ResponsibleSection(c2, data.ByResponsible));
             }
 
+            if (data.Reversions.Count > 0)
+            {
+                col.Item().PaddingTop(22).Element(c2 => ReversionSection(c2, data.Reversions));
+            }
+
             col.Item()
                 .PaddingTop(28)
                 .DefaultTextStyle(ts => ts.FontSize(7.5f).Italic().FontColor(P.TextLight))
@@ -501,6 +506,72 @@ public class MonthlyReportPdfGenerator
                         DataCell(table.Cell(), bg, item.Overdue.ToString(), center: true);
                         DataCell(table.Cell(), bg, item.Pending.ToString(), center: true);
                         RateBadgeCell(table.Cell(), bg, $"{item.OnTimeRate:F1}%", rateText, rateBg);
+                    }
+                });
+        });
+    }
+
+    // ─── Reversion Table ─────────────────────────────────────────────────
+
+    private static void ReversionSection(IContainer c, List<ReversionSummaryDto> items)
+    {
+        c.Column(col =>
+        {
+            col.Item().Element(SectionTitle("Reversiones del Período"));
+            col.Item()
+                .PaddingTop(10)
+                .Table(table =>
+                {
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(22);
+                        cols.RelativeColumn(1.1f); // Fecha
+                        cols.RelativeColumn(2.8f); // Reporte
+                        cols.RelativeColumn(1.2f); // Estado anterior
+                        cols.RelativeColumn(1.2f); // Estado nuevo
+                        cols.RelativeColumn(2.5f); // Motivo
+                        cols.RelativeColumn(2f); // Realizado por
+                    });
+
+                    table.Header(h =>
+                        TableHeader(
+                            h,
+                            "#",
+                            "Fecha",
+                            "Reporte",
+                            "Estado Anterior",
+                            "Estado Nuevo",
+                            "Motivo",
+                            "Realizado por"
+                        )
+                    );
+
+                    bool alt = false;
+                    int i = 1;
+                    foreach (var rev in items)
+                    {
+                        var bg = alt ? P.RowAlt : P.White;
+                        alt = !alt;
+
+                        DataCell(table.Cell(), bg, i++.ToString(), center: true);
+                        DataCell(
+                            table.Cell(),
+                            bg,
+                            rev.CreatedAt.ToString("dd/MM/yyyy"),
+                            center: true
+                        );
+                        DataCell(
+                            table.Cell(),
+                            bg,
+                            string.IsNullOrEmpty(rev.ReportCode)
+                                ? rev.ReportName
+                                : $"{rev.ReportCode} — {rev.ReportName}",
+                            bold: true
+                        );
+                        DataCell(table.Cell(), bg, rev.PreviousStatus, center: true);
+                        DataCell(table.Cell(), bg, rev.NewStatus, center: true);
+                        DataCell(table.Cell(), bg, rev.Reason);
+                        DataCell(table.Cell(), bg, rev.CreatedByUserName);
                     }
                 });
         });

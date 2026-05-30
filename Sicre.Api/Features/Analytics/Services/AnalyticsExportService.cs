@@ -29,6 +29,9 @@ public sealed class AnalyticsExportService(
         var branches =
             (await analyticsService.GetComplianceByBranchAsync(userId, userRoles, filter)).Data
             ?? [];
+        var reversions =
+            (await analyticsService.GetReversionsByPeriodAsync(userId, userRoles, filter)).Data
+            ?? [];
 
         var now = DateTime.UtcNow;
         var dateRangeLabel = BuildDateRangeLabel(filter);
@@ -45,6 +48,7 @@ public sealed class AnalyticsExportService(
             ByEntity = entities,
             ByResponsible = responsible,
             ByBranch = branches,
+            Reversions = reversions,
             LogoLlanogas = TryReadLogoFile("logo-llanogas.webp"),
             LogoCusianagas = TryReadLogoFile("logo-cusianogas.webp"),
         };

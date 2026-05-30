@@ -477,4 +477,95 @@ public class AnalyticsService(
             );
         }
     }
+
+    public async Task<ApiResponse<List<ReversionSummaryDto>>> GetReversionsByPeriodAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    )
+    {
+        try
+        {
+            var isElevated = userRoles
+                .Intersect(ElevatedRoles, StringComparer.OrdinalIgnoreCase)
+                .Any();
+
+            var query = context
+                .ReportReversions.AsNoTracking()
+                .Include(r => r.ReportInstance)
+                    .ThenInclude(i => i!.Report)
+                .Include(r => r.CreatedByUser)
+                .AsQueryable();
+
+            if (!isElevated)
+                query = query.Where(r =>
+                    r.ReportInstance != null
+                    && (
+                        r.ReportInstance.ResponsibleUserId == userId
+                        || r.ReportInstance.SupervisorUserId == userId
+                        || (
+                            r.ReportInstance.Report != null
+                            && (
+                                r.ReportInstance.Report.SenderResponsibleUserId == userId
+                                || r.ReportInstance.Report.EntityUploadResponsibleUserId == userId
+                                || r.ReportInstance.Report.FollowUpLeaderUserId == userId
+                            )
+                        )
+                    )
+                );
+
+            if (filter.StartDate.HasValue)
+                query = query.Where(r =>
+                    r.CreatedAt >= filter.StartDate.Value.ToDateTime(TimeOnly.MinValue)
+                );
+
+            if (filter.EndDate.HasValue)
+                query = query.Where(r =>
+                    r.CreatedAt < filter.EndDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue)
+                );
+
+            var result = await query
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => new ReversionSummaryDto
+                {
+                    ReportName =
+                        r.ReportInstance != null && r.ReportInstance.Report != null
+                            ? r.ReportInstance.Report.Name
+                            : "—",
+                    ReportCode =
+                        r.ReportInstance != null && r.ReportInstance.Report != null
+                            ? r.ReportInstance.Report.Code
+                            : "—",
+                    PreviousStatus = StatusLabel(r.PreviousStatus),
+                    NewStatus = StatusLabel(r.NewStatus),
+                    Reason = r.Reason,
+                    CreatedByUserName =
+                        r.CreatedByUser != null
+                            ? r.CreatedByUser.FirstName + " " + r.CreatedByUser.LastName
+                            : "—",
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToListAsync();
+
+            return ApiResponse<List<ReversionSummaryDto>>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting reversions by period");
+            return ApiResponse<List<ReversionSummaryDto>>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error obteniendo reversiones del período"
+            );
+        }
+    }
+
+    private static string StatusLabel(Domain.Enums.ReportStatus status) =>
+        status switch
+        {
+            Domain.Enums.ReportStatus.Pending => "Pendiente",
+            Domain.Enums.ReportStatus.SentOnTime => "A Tiempo",
+            Domain.Enums.ReportStatus.SentLate => "Tarde",
+            Domain.Enums.ReportStatus.Overdue => "No Reportado",
+            _ => status.ToString(),
+        };
 }
