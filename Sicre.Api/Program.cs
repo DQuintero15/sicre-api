@@ -198,6 +198,7 @@ builder.Services.AddScoped<INotificationAlertService, NotificationAlertService>(
 
 // Analytics feature
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IAnalyticsExportService, AnalyticsExportService>();
 
 // SICRE Settings
 builder.Services.AddScoped<ISICRESettingsService, SICRESettingsService>();
