@@ -64,58 +64,32 @@ public class NotificationAlertService(
 
             var recipients = CollectRecipients(eventType, instance, triggeredByUserId);
 
+            // ─── Notify registered users ───────────────────────────────
             foreach (var user in recipients.Values)
             {
-                var notification = new Notification
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = user.Id,
-                    Title = title,
-                    Content = content,
-                    Type = NotificationType.APP,
-                    Severity = severity,
-                    Priority = priority,
-                    ReportInstanceId = instance.Id,
-                    Url = $"/report-instances/{instance.Id}",
-                    CreatedAt = DateTime.UtcNow,
-                };
+                await NotifyUserAsync(user, title, content, severity, priority, instance, eventType, autoNotify, ct);
+            }
 
-                db.Notifications.Add(notification);
-                await db.SaveChangesAsync(ct);
+            // ─── Notify subscribers from NotificationEmails ────────────
+            var emailSubscribers = GetEmailSubscribers(instance, recipients.Keys, triggeredByUserId);
+            foreach (var email in emailSubscribers)
+            {
+                if (!autoNotify)
+                    continue;
 
-                await realtimeService.PublishCreatedAsync(
-                    new NotificationDto
-                    {
-                        Id = notification.Id,
-                        Title = notification.Title,
-                        Content = notification.Content,
-                        Type = notification.Type,
-                        Severity = notification.Severity,
-                        Priority = notification.Priority,
-                        Readed = false,
-                        CreatedAt = notification.CreatedAt,
-                        ReportInstanceId = notification.ReportInstanceId,
-                        Url = notification.Url,
-                    },
-                    user.Id
+                var emailBody = emailTemplateService.GetInstanceEventEmailTemplate(
+                    email,
+                    eventType,
+                    title,
+                    content,
+                    instance.Id
                 );
-
-                if (autoNotify && !string.IsNullOrWhiteSpace(user.Email))
-                {
-                    var emailBody = emailTemplateService.GetInstanceEventEmailTemplate(
-                        $"{user.FirstName} {user.LastName}",
-                        eventType,
-                        title,
-                        content,
-                        instance.Id
-                    );
-                    await emailService.SendEmailAsync(user.Email!, title, emailBody);
-                }
+                await emailService.SendEmailAsync(email, title, emailBody);
 
                 logger.LogInformation(
-                    "Notificación de evento {EventType} enviada a usuario {UserId} para instancia {InstanceId}.",
+                    "Notificación de evento {EventType} enviada por email a suscriptor {Email} para instancia {InstanceId}.",
                     eventType,
-                    user.Id,
+                    email,
                     instanceId
                 );
             }
@@ -181,7 +155,7 @@ public class NotificationAlertService(
         };
     }
 
-    private static Dictionary<Guid, User> CollectRecipients(
+    private Dictionary<Guid, User> CollectRecipients(
         string eventType,
         ReportInstance instance,
         Guid triggeredByUserId
@@ -213,6 +187,143 @@ public class NotificationAlertService(
                 break;
         }
 
+        // Add registered users whose email matches Report.NotificationEmails
+        if (!string.IsNullOrWhiteSpace(instance.Report?.NotificationEmails))
+        {
+            try
+            {
+                var emails = System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+                    instance.Report.NotificationEmails
+                );
+                if (emails is not null)
+                {
+                    var matchedUsers = db.Users
+                        .Where(u => emails.Contains(u.Email!) && u.Id != triggeredByUserId)
+                        .ToList();
+
+                    foreach (var user in matchedUsers)
+                    {
+                        if (!users.ContainsKey(user.Id))
+                            users[user.Id] = user;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Error al parsear NotificationEmails del reporte {ReportId}", instance.Report?.Id);
+            }
+        }
+
         return users;
+    }
+
+    private List<string> GetEmailSubscribers(
+        ReportInstance instance,
+        Dictionary<Guid, User>.KeyCollection alreadyNotifiedUserIds,
+        Guid triggeredByUserId
+    )
+    {
+        var emailOnly = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(instance.Report?.NotificationEmails))
+            return emailOnly;
+
+        try
+        {
+            var emails = System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+                instance.Report.NotificationEmails
+            );
+            if (emails is null)
+                return emailOnly;
+
+            var registeredEmails = db.Users
+                .Where(u => emails.Contains(u.Email!))
+                .Select(u => u.Email!)
+                .ToHashSet();
+
+            foreach (var email in emails)
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                    continue;
+
+                // Skip if this email belongs to a user who was already notified
+                if (registeredEmails.Contains(email))
+                    continue;
+
+                emailOnly.Add(email);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Error al procesar NotificationEmails del reporte {ReportId}", instance.Report?.Id);
+        }
+
+        return emailOnly;
+    }
+
+    private async Task NotifyUserAsync(
+        User user,
+        string title,
+        string content,
+        NotificationSeverity severity,
+        NotificationPriority priority,
+        ReportInstance instance,
+        string eventType,
+        bool autoNotify,
+        CancellationToken ct
+    )
+    {
+        var notification = new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Title = title,
+            Content = content,
+            Type = NotificationType.APP,
+            Severity = severity,
+            Priority = priority,
+            ReportInstanceId = instance.Id,
+            Url = $"/report-instances/{instance.Id}",
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        db.Notifications.Add(notification);
+        await db.SaveChangesAsync(ct);
+
+        await realtimeService.PublishCreatedAsync(
+            new NotificationDto
+            {
+                Id = notification.Id,
+                Title = notification.Title,
+                Content = notification.Content,
+                Type = notification.Type,
+                Severity = notification.Severity,
+                Priority = notification.Priority,
+                Readed = false,
+                CreatedAt = notification.CreatedAt,
+                ReportInstanceId = notification.ReportInstanceId,
+                Url = notification.Url,
+            },
+            user.Id
+        );
+
+        if (autoNotify && !string.IsNullOrWhiteSpace(user.Email))
+        {
+            var emailBody = emailTemplateService.GetInstanceEventEmailTemplate(
+                $"{user.FirstName} {user.LastName}",
+                eventType,
+                title,
+                content,
+                instance.Id
+            );
+            await emailService.SendEmailAsync(user.Email!, title, emailBody);
+        }
+
+        logger.LogInformation(
+            "Notificación de evento {EventType} enviada a usuario {UserId} para instancia {InstanceId}.",
+            eventType,
+            user.Id,
+            instance.Id
+        );
     }
 }
