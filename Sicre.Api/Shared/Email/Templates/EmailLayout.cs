@@ -2,98 +2,15 @@ namespace Sicre.Api.Shared.Email.Templates;
 
 internal static class EmailLayout
 {
-    private static byte[]? _llanogasBytes;
-    private static byte[]? _cusianagasBytes;
-    private static bool _initialized;
+    private const string LlanogasLogoUrl =
+        "https://www.llanogas.com/sites/default/files/2025-08/logo-llanogas.png";
+    private const string CusianagasLogoUrl =
+        "https://cusianagas.com/sites/default/files/2025-08/Cusianagas.png";
 
-    internal static void Initialize(string contentRootPath)
-    {
-        if (_initialized)
-            return;
-        _initialized = true;
+    internal static void Initialize(string contentRootPath) { }
 
-        try
-        {
-            var llanogasPath = Path.Combine(
-                contentRootPath,
-                "Assets",
-                "Images",
-                "logo-llanogas.webp"
-            );
-            var cusianagasPath = Path.Combine(
-                contentRootPath,
-                "Assets",
-                "Images",
-                "logo-cusianagas.webp"
-            );
-
-            if (File.Exists(llanogasPath))
-                _llanogasBytes = File.ReadAllBytes(llanogasPath);
-
-            if (File.Exists(cusianagasPath))
-                _cusianagasBytes = File.ReadAllBytes(cusianagasPath);
-        }
-        catch
-        {
-            // Logos are optional
-        }
-    }
-
-    // Returns (contentId, bytes) pairs for MailKit LinkedResources
-    internal static IEnumerable<(string ContentId, byte[] Data)> GetInlineLogos()
-    {
-        if (_llanogasBytes != null)
-            yield return ("logo-llanogas", _llanogasBytes);
-        if (_cusianagasBytes != null)
-            yield return ("logo-cusianagas", _cusianagasBytes);
-    }
-
-    internal static string Wrap(string bodyHtml)
-    {
-        var hasLlanogas = _llanogasBytes != null;
-        var hasCusianagas = _cusianagasBytes != null;
-
-        string logosHtml;
-
-        if (hasLlanogas && hasCusianagas)
-        {
-            logosHtml = """
-                <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;background-color:#ffffff;">
-                  <tr>
-                    <td align="center" bgcolor="#ffffff">
-                      <table cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td style="padding:0 8px 0 0;vertical-align:middle;background-color:#ffffff;">
-                            <img src="cid:logo-llanogas" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;background-color:#ffffff;" />
-                          </td>
-                          <td style="padding:0 0 0 8px;vertical-align:middle;background-color:#ffffff;">
-                            <img src="cid:logo-cusianagas" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;background-color:#ffffff;" />
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-                """;
-        }
-        else if (hasLlanogas)
-        {
-            logosHtml = """
-                <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0 20px;background-color:#ffffff;">
-                  <tr>
-                    <td align="center" bgcolor="#ffffff">
-                      <img src="cid:logo-llanogas" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;background-color:#ffffff;" />
-                    </td>
-                  </tr>
-                </table>
-                """;
-        }
-        else
-        {
-            logosHtml = "";
-        }
-
-        return $"""
+    internal static string Wrap(string bodyHtml) =>
+        $"""
             <html lang="es">
             <head>
               <meta charset="UTF-8" />
@@ -105,7 +22,20 @@ internal static class EmailLayout
                   <td align="center">
                     <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
 
-                      {logosHtml}
+                      <tr>
+                        <td align="center" style="padding:24px 0 20px;">
+                          <table cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td style="padding:0 8px 0 0;vertical-align:middle;">
+                                <img src="{LlanogasLogoUrl}" alt="Llanogas" width="110" style="display:block;height:auto;max-height:32px;" />
+                              </td>
+                              <td style="padding:0 0 0 8px;vertical-align:middle;">
+                                <img src="{CusianagasLogoUrl}" alt="Cusianagas" width="80" style="display:block;height:auto;max-height:24px;" />
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
 
                       <tr>
                         <td style="padding:0 0 20px;">
@@ -128,5 +58,4 @@ internal static class EmailLayout
             </body>
             </html>
             """;
-    }
 }

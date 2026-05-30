@@ -3,7 +3,6 @@ using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using Sicre.Api.Config;
-using Sicre.Api.Shared.Email.Templates;
 
 namespace Sicre.Api.Shared.Email;
 
@@ -128,20 +127,6 @@ public class EmailService(
             builder.HtmlBody = body;
         else
             builder.TextBody = body;
-
-        if (isHtml)
-        {
-            foreach (var (contentId, data) in EmailLayout.GetInlineLogos())
-            {
-                var resource = builder.LinkedResources.Add(
-                    contentId + ".webp",
-                    data,
-                    new ContentType("image", "webp")
-                );
-                resource.ContentId = contentId;
-                resource.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
-            }
-        }
 
         if (attachments?.Count > 0)
         {
