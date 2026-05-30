@@ -35,4 +35,10 @@ public interface IAnalyticsService
         int month,
         int year
     );
+
+    Task<ApiResponse<List<BranchComplianceDto>>> GetComplianceByBranchAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    );
 }

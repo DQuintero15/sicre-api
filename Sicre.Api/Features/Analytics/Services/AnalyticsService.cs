@@ -60,6 +60,9 @@ public class AnalyticsService(
         if (filter.ResponsibleUserId.HasValue)
             query = query.Where(i => i.ResponsibleUserId == filter.ResponsibleUserId.Value);
 
+        if (filter.BranchId.HasValue)
+            query = query.Where(i => i.Report != null && i.Report.BranchId == filter.BranchId.Value);
+
         return query;
     }
 
@@ -410,6 +413,64 @@ public class AnalyticsService(
             return ApiResponse<MonthlyInstancesMetricsDto>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error obteniendo métricas mensuales"
+            );
+        }
+    }
+
+    public async Task<ApiResponse<List<BranchComplianceDto>>> GetComplianceByBranchAsync(
+        Guid userId,
+        IList<string> userRoles,
+        AnalyticsFilterRequest filter
+    )
+    {
+        try
+        {
+            var query = BuildBaseQuery(userId, userRoles);
+            query = query.Include(i => i.Report).ThenInclude(r => r!.Branch);
+            query = ApplyFilters(query, filter);
+
+            var flatData = await query
+                .Select(i => new
+                {
+                    BranchName = i.Report != null && i.Report.Branch != null
+                        ? i.Report.Branch.Name
+                        : "Sin Sede",
+                    i.Status,
+                })
+                .ToListAsync();
+
+            var grouped = flatData
+                .GroupBy(x => x.BranchName)
+                .Select(g =>
+                {
+                    var total = g.Count();
+                    var onTime = g.Count(x => x.Status == ReportStatus.SentOnTime);
+                    var late = g.Count(x => x.Status == ReportStatus.SentLate);
+                    var overdue = g.Count(x => x.Status == ReportStatus.Overdue);
+                    var pend = g.Count(x => x.Status == ReportStatus.Pending);
+
+                    return new BranchComplianceDto(
+                        BranchName: g.Key,
+                        Total: total,
+                        OnTime: onTime,
+                        Late: late,
+                        Overdue: overdue,
+                        Pending: pend,
+                        OnTimeRate: total > 0 ? Math.Round((double)onTime / total * 100, 2) : 0,
+                        DeliveryRate: total > 0 ? Math.Round((double)(onTime + late) / total * 100, 2) : 0
+                    );
+                })
+                .OrderByDescending(x => x.OnTimeRate)
+                .ToList();
+
+            return ApiResponse<List<BranchComplianceDto>>.Ok(grouped);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting compliance by branch");
+            return ApiResponse<List<BranchComplianceDto>>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error obteniendo cumplimiento por sede"
             );
         }
     }

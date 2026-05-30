@@ -97,6 +97,19 @@ public class AnalyticsController(IAnalyticsService analyticsService) : BaseContr
         return FromResult(result);
     }
 
+    [HttpGet("compliance-by-branch")]
+    public async Task<ActionResult<ApiResponse<List<BranchComplianceDto>>>> GetComplianceByBranch(
+        [FromQuery] AnalyticsFilterRequest filter
+    )
+    {
+        var result = await analyticsService.GetComplianceByBranchAsync(
+            GetUserId(),
+            GetUserRoles(),
+            filter
+        );
+        return FromResult(result);
+    }
+
     private List<string> GetUserRoles() =>
         User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
 }
