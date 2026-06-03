@@ -506,7 +506,7 @@ namespace Sicre.Api.Migrations
                     b.Property<Guid>("FollowUpLeaderUserId")
                         .HasColumnType("uuid");
 
-                    b.PrimitiveCollection<string>("FormatTypes")
+                    b.Property<string>("FormatTypes")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -535,7 +535,7 @@ namespace Sicre.Api.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("NotificationEmails")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("text");
 
                     b.Property<string>("OriginalDueDateText")
                         .HasColumnType("text");

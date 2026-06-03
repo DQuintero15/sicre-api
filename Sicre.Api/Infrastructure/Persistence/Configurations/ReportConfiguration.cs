@@ -1,11 +1,20 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sicre.Api.Domain.Entities;
+using Sicre.Api.Domain.Enums;
 
 namespace Sicre.Api.Infrastructure.Persistence.Configurations;
 
 public class ReportConfiguration : IEntityTypeConfiguration<Report>
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
     public void Configure(EntityTypeBuilder<Report> builder)
     {
         builder.ToTable("reports", "reports");
@@ -16,7 +25,8 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
         builder.Property(r => r.LegalBasis).HasColumnType("text");
         builder.Property(r => r.InstructionsUrl).HasColumnType("text");
         builder.Property(r => r.TemplateFileUrl).HasColumnType("text");
-        builder.Property(r => r.NotificationEmails).HasColumnType("jsonb");
+        // NotificationEmails is a plain comma-separated string — store as text, not jsonb
+        builder.Property(r => r.NotificationEmails).HasColumnType("text");
         builder.Property(r => r.DueDateDatesDefinition).HasColumnType("jsonb");
         builder.Property(r => r.OriginalDueDateText).HasColumnType("text");
         builder.Property(r => r.IsActive).HasDefaultValue(true);
@@ -39,7 +49,18 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .HasConversion<string>()
             .HasColumnType("varchar(50)");
 
-        builder.Property(r => r.FormatTypes).IsRequired().HasColumnType("jsonb");
+        // FormatTypes: serialize enum names (not integers) to jsonb
+        var formatTypesConverter = new ValueConverter<List<ReportFormatType>, string>(
+            v => JsonSerializer.Serialize(v, JsonOptions),
+            v =>
+                JsonSerializer.Deserialize<List<ReportFormatType>>(v, JsonOptions)
+                ?? new List<ReportFormatType>()
+        );
+        builder
+            .Property(r => r.FormatTypes)
+            .IsRequired()
+            .HasConversion(formatTypesConverter)
+            .HasColumnType("jsonb");
         builder.Property(r => r.AlertEarlyDays).HasDefaultValue(15);
         builder.Property(r => r.AlertFollowUpDays).HasDefaultValue(5);
         builder.Property(r => r.AlertCriticalDays).HasDefaultValue(0);
