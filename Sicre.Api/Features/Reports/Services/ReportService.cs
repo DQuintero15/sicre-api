@@ -378,6 +378,8 @@ public class ReportService(
                 report.EntityUploadResponsibleUserId = request.EntityUploadResponsibleUserId.Value;
             if (request.FollowUpLeaderUserId.HasValue)
                 report.FollowUpLeaderUserId = request.FollowUpLeaderUserId.Value;
+            if (request.IsActive.HasValue)
+                report.IsActive = request.IsActive.Value;
 
             report.UpdatedAt = DateTime.UtcNow;
             report.UpdatedByUserId = updatedByUserId;

@@ -19,4 +19,5 @@ public class UpdateReportRequest
     public Guid? SenderResponsibleUserId { get; set; }
     public Guid? EntityUploadResponsibleUserId { get; set; }
     public Guid? FollowUpLeaderUserId { get; set; }
+    public bool? IsActive { get; set; }
 }
