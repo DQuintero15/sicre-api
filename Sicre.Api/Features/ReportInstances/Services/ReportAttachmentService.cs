@@ -461,11 +461,12 @@ public class ReportAttachmentService(
     {
         var ext = Path.GetExtension(originalFileName);
         var periodCode = GetPeriodCode(instance);
-        var suffix = GetTypeSuffix(type);
-        return $"{code.ToUpperInvariant()}_{periodCode}_{suffix}{ext}";
+        var typeLabel = GetTypeLabel(type);
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return $"{code.ToUpperInvariant()}_{periodCode}_{typeLabel}_{timestamp}{ext}";
     }
 
-    // File name:   RIESGO-01_2026-05_RF.pdf
+    // File name:   RIESGO-01_2026-05_Informe_Final_20260603-143022.pdf
     // Folder path: CIE / RIESGO-01 / 2026 / 05
     private static string GetPeriodCode(ReportInstance i)
     {
@@ -499,15 +500,16 @@ public class ReportAttachmentService(
 
     private static string GetEntityFolderName(Report r) => r.ControlEntity?.Abbreviation ?? r.Code;
 
-    private static string GetTypeSuffix(AttachmentType t) =>
-        t switch
+    private static string GetTypeLabel(AttachmentType type) =>
+        type switch
         {
-            AttachmentType.FinalReport => "RF",
-            AttachmentType.SubmissionEvidence => "EE",
-            AttachmentType.DeadlineExtensionEvidence => "EA",
-            AttachmentType.ReversionEvidence => "ER",
-            AttachmentType.Other => "OT",
-            _ => "OT",
+            AttachmentType.FinalReport => "Informe_Final",
+            AttachmentType.SubmissionEvidence => "Evidencia_de_Envio",
+            AttachmentType.DeadlineExtensionEvidence => "Ampliacion_de_Plazo",
+            AttachmentType.ReversionEvidence => "Soporte_de_Reversion",
+            AttachmentType.SupportingDocument => "Documento_Soporte",
+            AttachmentType.Other => "Otro",
+            _ => "Otro",
         };
 
     private static int Quarter(int? month) => ((month ?? 1) - 1) / 3 + 1;

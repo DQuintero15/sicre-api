@@ -181,6 +181,7 @@ public class ReportImportService(
         report.BranchId = branchId;
         report.ProcessId = processId;
         report.LegalBasis = item.LegalBasis;
+        report.Description = item.Description;
         report.Frequency = frequency;
         report.GenerationMode = generationMode;
         report.DueDateRuleType = dueDateRuleType;

@@ -55,6 +55,7 @@ public class UserFilterDto : PagedRequestDto
     public string? LastName { get; set; }
     public bool? IsActive { get; set; }
     public Role? Role { get; set; }
+    public string? Search { get; set; }
 }
 
 public class ImportUsersFromCsvResponseDto

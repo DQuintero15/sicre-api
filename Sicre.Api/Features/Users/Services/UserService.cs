@@ -170,6 +170,16 @@ public class UserService(
                 query = query.Where(u => usersInRole.Contains(u.Id));
             }
 
+            if (!string.IsNullOrWhiteSpace(filter.Search))
+            {
+                var search = filter.Search.ToLower();
+                query = query.Where(u =>
+                    u.FirstName.ToLower().Contains(search)
+                    || u.LastName.ToLower().Contains(search)
+                    || (u.Email != null && u.Email.ToLower().Contains(search))
+                );
+            }
+
             var total = await query.CountAsync();
             var users = await query
                 .Include(u => u.Position)

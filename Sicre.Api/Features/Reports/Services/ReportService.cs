@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Features.Reports.Dtos.Requests;
@@ -46,7 +47,8 @@ public class ReportService(
     ApplicationDbContext db,
     ILogger<ReportService> logger,
     IReportInstanceGenerator generator,
-    IDateHelper dateHelper
+    IDateHelper dateHelper,
+    INotificationAlertService notificationAlertService
 ) : IReportService
 {
     public async Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
@@ -252,6 +254,7 @@ public class ReportService(
                 ProcessId = request.ProcessId,
                 BranchId = request.BranchId,
                 LegalBasis = request.LegalBasis,
+                Description = request.Description,
                 Frequency = request.Frequency,
                 GenerationMode = request.GenerationMode,
                 DueDateRuleType = request.DueDateRuleType,
@@ -261,7 +264,7 @@ public class ReportService(
                 OriginalDueDateText = request.OriginalDueDateText,
                 AlertEarlyDays = request.AlertEarlyDays,
                 AlertFollowUpDays = request.AlertFollowUpDays,
-                AlertCriticalDays = request.AlertCriticalDays,
+                AlertCriticalDays = request.AlertCriticalDays ?? 0,
                 FormatTypes = request.FormatTypes,
                 InstructionsUrl = request.InstructionsUrl,
                 TemplateFileUrl = request.TemplateFileUrl,
@@ -297,6 +300,26 @@ public class ReportService(
             await db.Entry(report).Reference(r => r.SenderResponsibleUser).LoadAsync(ct);
             await db.Entry(report).Reference(r => r.EntityUploadResponsibleUser).LoadAsync(ct);
             await db.Entry(report).Reference(r => r.FollowUpLeaderUser).LoadAsync(ct);
+            await db.Entry(report).Collection(r => r.Instances).LoadAsync(ct);
+
+            try
+            {
+                await notificationAlertService.NotifyInstanceEventAsync(
+                    report,
+                    null,
+                    "ReportCreated",
+                    createdByUserId,
+                    ct
+                );
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Error al enviar notificacion de ReportCreated para {Code}",
+                    report.Code
+                );
+            }
 
             return ApiResponse<ReportResponse>.Ok(
                 ToResponse(report),
@@ -343,6 +366,8 @@ public class ReportService(
                 report.Name = request.Name;
             if (request.LegalBasis != null)
                 report.LegalBasis = request.LegalBasis;
+            if (request.Description is not null)
+                report.Description = request.Description;
             if (request.OriginalDueDateText != null)
                 report.OriginalDueDateText = request.OriginalDueDateText;
             if (request.AlertEarlyDays.HasValue)
@@ -375,6 +400,8 @@ public class ReportService(
                 report.EntityUploadResponsibleUserId = request.EntityUploadResponsibleUserId.Value;
             if (request.FollowUpLeaderUserId.HasValue)
                 report.FollowUpLeaderUserId = request.FollowUpLeaderUserId.Value;
+            if (request.IsActive.HasValue)
+                report.IsActive = request.IsActive.Value;
 
             report.UpdatedAt = DateTime.UtcNow;
             report.UpdatedByUserId = updatedByUserId;
@@ -545,6 +572,7 @@ public class ReportService(
             BranchId = r.BranchId,
             BranchName = r.Branch?.Name,
             LegalBasis = r.LegalBasis,
+            Description = r.Description,
             Frequency = r.Frequency,
             GenerationMode = r.GenerationMode,
             DueDateRuleType = r.DueDateRuleType,

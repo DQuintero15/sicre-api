@@ -72,15 +72,15 @@ public class NotificationJobService(
                 {
                     alertType = "Crítica";
                 }
-                else if (daysUntilDue == instance.Report.AlertCriticalDays)
+                else if (daysUntilDue <= instance.Report.AlertCriticalDays)
                 {
                     alertType = "Riesgo";
                 }
-                else if (daysUntilDue == instance.Report.AlertFollowUpDays)
+                else if (daysUntilDue <= instance.Report.AlertFollowUpDays)
                 {
                     alertType = "Seguimiento";
                 }
-                else if (daysUntilDue == instance.Report.AlertEarlyDays)
+                else if (daysUntilDue <= instance.Report.AlertEarlyDays)
                 {
                     alertType = "Preventiva";
                 }

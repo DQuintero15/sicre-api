@@ -7,6 +7,7 @@ public class UpdateReportRequest
     public string? Code { get; set; }
     public string? Name { get; set; }
     public string? LegalBasis { get; set; }
+    public string? Description { get; set; }
     public string? OriginalDueDateText { get; set; }
     public int? AlertEarlyDays { get; set; }
     public int? AlertFollowUpDays { get; set; }
@@ -18,4 +19,5 @@ public class UpdateReportRequest
     public Guid? SenderResponsibleUserId { get; set; }
     public Guid? EntityUploadResponsibleUserId { get; set; }
     public Guid? FollowUpLeaderUserId { get; set; }
+    public bool? IsActive { get; set; }
 }

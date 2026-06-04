@@ -10,6 +10,7 @@ public class CreateReportRequest
     public Guid? ProcessId { get; set; }
     public Guid? BranchId { get; set; }
     public string? LegalBasis { get; set; }
+    public string? Description { get; set; }
     public ReportFrequency Frequency { get; set; }
     public ReportGenerationMode GenerationMode { get; set; }
     public ReportDueDateRuleType DueDateRuleType { get; set; }
@@ -26,7 +27,7 @@ public class CreateReportRequest
 
     public int AlertEarlyDays { get; set; }
     public int AlertFollowUpDays { get; set; }
-    public int AlertCriticalDays { get; set; }
+    public int? AlertCriticalDays { get; set; }
     public List<ReportFormatType> FormatTypes { get; set; } = [];
     public string? InstructionsUrl { get; set; }
     public string? TemplateFileUrl { get; set; }
