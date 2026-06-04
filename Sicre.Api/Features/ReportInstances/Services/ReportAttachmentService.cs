@@ -500,16 +500,17 @@ public class ReportAttachmentService(
 
     private static string GetEntityFolderName(Report r) => r.ControlEntity?.Abbreviation ?? r.Code;
 
-    private static string GetTypeLabel(AttachmentType type) => type switch
-    {
-        AttachmentType.FinalReport => "Informe_Final",
-        AttachmentType.SubmissionEvidence => "Evidencia_de_Envio",
-        AttachmentType.DeadlineExtensionEvidence => "Ampliacion_de_Plazo",
-        AttachmentType.ReversionEvidence => "Soporte_de_Reversion",
-        AttachmentType.SupportingDocument => "Documento_Soporte",
-        AttachmentType.Other => "Otro",
-        _ => "Otro",
-    };
+    private static string GetTypeLabel(AttachmentType type) =>
+        type switch
+        {
+            AttachmentType.FinalReport => "Informe_Final",
+            AttachmentType.SubmissionEvidence => "Evidencia_de_Envio",
+            AttachmentType.DeadlineExtensionEvidence => "Ampliacion_de_Plazo",
+            AttachmentType.ReversionEvidence => "Soporte_de_Reversion",
+            AttachmentType.SupportingDocument => "Documento_Soporte",
+            AttachmentType.Other => "Otro",
+            _ => "Otro",
+        };
 
     private static int Quarter(int? month) => ((month ?? 1) - 1) / 3 + 1;
 
