@@ -23,6 +23,7 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
         builder.Property(r => r.Code).IsRequired().HasMaxLength(50);
         builder.Property(r => r.Name).IsRequired().HasMaxLength(200);
         builder.Property(r => r.LegalBasis).HasColumnType("text");
+        builder.Property(r => r.Description).HasColumnType("text");
         builder.Property(r => r.InstructionsUrl).HasColumnType("text");
         builder.Property(r => r.TemplateFileUrl).HasColumnType("text");
         // NotificationEmails is a plain comma-separated string — store as text, not jsonb
