@@ -191,6 +191,10 @@ builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();
 builder.Services.AddSingleton<IBackgroundQueueService, BackgroundQueueService>();
 builder.Services.AddHostedService<DriveUploadWorker>();
 
+// Email background queue
+builder.Services.AddSingleton<IEmailBackgroundQueue, EmailBackgroundQueue>();
+builder.Services.AddHostedService<EmailNotificationWorker>();
+
 // Notification feature services
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationRealtimeService, NotificationRealtimeService>();
