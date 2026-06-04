@@ -308,7 +308,10 @@ public class NotificationAlertService(
         }
     }
 
-    public async Task NotifyInstanceCreatedAsync(ReportInstance instance, CancellationToken ct = default)
+    public async Task NotifyInstanceCreatedAsync(
+        ReportInstance instance,
+        CancellationToken ct = default
+    )
     {
         try
         {

@@ -12,7 +12,8 @@ namespace Sicre.Api.Features.Auth.Controllers;
 public class AuthController(
     IAuthService authService,
     ICookieService cookieService,
-    ITokenService tokenService
+    ITokenService tokenService,
+    IRefreshTokenService refreshTokenService
 ) : BaseController
 {
     [HttpGet("needs-password-setup")]
@@ -193,6 +194,15 @@ public class AuthController(
     {
         var result = await authService.GetTwoFactorEnabledAsync(GetUserId());
         return FromResult(result);
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> Logout()
+    {
+        await refreshTokenService.RevokeRefreshTokenAsync(GetUserId());
+        cookieService.RemoveRefreshTokenCookie(Response);
+        return FromResult(ApiResponse<bool>.Ok(true, "Sesión cerrada exitosamente."));
     }
 
     [HttpPost("forgot-password")]

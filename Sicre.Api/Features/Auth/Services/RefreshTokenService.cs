@@ -114,28 +114,38 @@ public class RefreshTokenService(ILogger<RefreshTokenService> logger, Applicatio
     {
         try
         {
-            var token = await db.RefreshTokens.FirstOrDefaultAsync(rt =>
-                rt.UserId == userId && !rt.IsRevoked
-            );
+            var activeTokens = await db
+                .RefreshTokens.Where(rt => rt.UserId == userId && !rt.IsRevoked)
+                .ToListAsync();
 
-            if (token == null)
+            if (activeTokens.Count == 0)
                 return ApiResponse<bool>.Fail(
                     HttpStatusCode.NotFound,
-                    "No se encontró token de refresco para revocar."
+                    "No se encontraron tokens de refresco activos para revocar."
                 );
 
-            token.IsRevoked = true;
+            foreach (var token in activeTokens)
+                token.IsRevoked = true;
+
             await db.SaveChangesAsync();
 
-            logger.LogInformation("Token de refresco revocado para usuario {UserId}", userId);
-            return ApiResponse<bool>.Ok(true, "Token de refresco revocado exitosamente.");
+            logger.LogInformation(
+                "Se revocaron {Count} tokens de refresco para usuario {UserId}",
+                activeTokens.Count,
+                userId
+            );
+            return ApiResponse<bool>.Ok(true, "Tokens de refresco revocados exitosamente.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error al revocar token de refresco para usuario {UserId}", userId);
+            logger.LogError(
+                ex,
+                "Error al revocar tokens de refresco para usuario {UserId}",
+                userId
+            );
             return ApiResponse<bool>.Fail(
                 HttpStatusCode.InternalServerError,
-                "Ocurrió un error al revocar el token de refresco."
+                "Ocurrió un error al revocar los tokens de refresco."
             );
         }
     }
