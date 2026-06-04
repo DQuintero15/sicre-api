@@ -112,7 +112,11 @@ public class ReportGenerationJobService(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "No se pudo notificar la creación de instancia {InstanceId}", instance.Id);
+                    logger.LogWarning(
+                        ex,
+                        "No se pudo notificar la creación de instancia {InstanceId}",
+                        instance.Id
+                    );
                 }
 
                 logger.LogInformation(
