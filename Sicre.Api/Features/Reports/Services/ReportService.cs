@@ -252,6 +252,7 @@ public class ReportService(
                 ProcessId = request.ProcessId,
                 BranchId = request.BranchId,
                 LegalBasis = request.LegalBasis,
+                Description = request.Description,
                 Frequency = request.Frequency,
                 GenerationMode = request.GenerationMode,
                 DueDateRuleType = request.DueDateRuleType,
@@ -343,6 +344,8 @@ public class ReportService(
                 report.Name = request.Name;
             if (request.LegalBasis != null)
                 report.LegalBasis = request.LegalBasis;
+            if (request.Description is not null)
+                report.Description = request.Description;
             if (request.OriginalDueDateText != null)
                 report.OriginalDueDateText = request.OriginalDueDateText;
             if (request.AlertEarlyDays.HasValue)
@@ -545,6 +548,7 @@ public class ReportService(
             BranchId = r.BranchId,
             BranchName = r.Branch?.Name,
             LegalBasis = r.LegalBasis,
+            Description = r.Description,
             Frequency = r.Frequency,
             GenerationMode = r.GenerationMode,
             DueDateRuleType = r.DueDateRuleType,
