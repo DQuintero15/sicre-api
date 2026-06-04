@@ -262,7 +262,7 @@ public class ReportService(
                 OriginalDueDateText = request.OriginalDueDateText,
                 AlertEarlyDays = request.AlertEarlyDays,
                 AlertFollowUpDays = request.AlertFollowUpDays,
-                AlertCriticalDays = request.AlertCriticalDays,
+                AlertCriticalDays = request.AlertCriticalDays ?? 0,
                 FormatTypes = request.FormatTypes,
                 InstructionsUrl = request.InstructionsUrl,
                 TemplateFileUrl = request.TemplateFileUrl,

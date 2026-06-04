@@ -27,7 +27,7 @@ public class CreateReportRequest
 
     public int AlertEarlyDays { get; set; }
     public int AlertFollowUpDays { get; set; }
-    public int AlertCriticalDays { get; set; }
+    public int? AlertCriticalDays { get; set; }
     public List<ReportFormatType> FormatTypes { get; set; } = [];
     public string? InstructionsUrl { get; set; }
     public string? TemplateFileUrl { get; set; }
