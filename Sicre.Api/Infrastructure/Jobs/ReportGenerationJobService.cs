@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.Reports.Services;
 using Sicre.Api.Infrastructure.Persistence;
 
@@ -14,7 +15,8 @@ public interface IReportGenerationJobService
 public class ReportGenerationJobService(
     ApplicationDbContext db,
     ILogger<ReportGenerationJobService> logger,
-    IReportInstanceGenerator generator
+    IReportInstanceGenerator generator,
+    INotificationAlertService notificationAlertService
 ) : IReportGenerationJobService
 {
     public async Task RunAsync()
@@ -99,6 +101,19 @@ public class ReportGenerationJobService(
 
                 db.ReportInstances.Add(instance);
                 await db.SaveChangesAsync(ct);
+
+                instance.Report = report;
+                await db.Entry(instance).Reference(i => i.ResponsibleUser).LoadAsync(ct);
+                await db.Entry(instance).Reference(i => i.SupervisorUser).LoadAsync(ct);
+
+                try
+                {
+                    await notificationAlertService.NotifyInstanceCreatedAsync(instance, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "No se pudo notificar la creación de instancia {InstanceId}", instance.Id);
+                }
 
                 logger.LogInformation(
                     "ReportGenerationJob: instancia creada para reporte {ReportId} — {PeriodName} (Status: {Status}).",

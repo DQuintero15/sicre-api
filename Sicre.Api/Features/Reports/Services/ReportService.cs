@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
+using Sicre.Api.Features.Notifications.Services;
 using Sicre.Api.Features.ReportInstances.Dtos.Responses;
 using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Features.Reports.Dtos.Requests;
@@ -46,7 +47,8 @@ public class ReportService(
     ApplicationDbContext db,
     ILogger<ReportService> logger,
     IReportInstanceGenerator generator,
-    IDateHelper dateHelper
+    IDateHelper dateHelper,
+    INotificationAlertService notificationAlertService
 ) : IReportService
 {
     public async Task<ApiResponse<PagedResult<ReportSummaryResponse>>> GetAllAsync(
@@ -298,6 +300,26 @@ public class ReportService(
             await db.Entry(report).Reference(r => r.SenderResponsibleUser).LoadAsync(ct);
             await db.Entry(report).Reference(r => r.EntityUploadResponsibleUser).LoadAsync(ct);
             await db.Entry(report).Reference(r => r.FollowUpLeaderUser).LoadAsync(ct);
+            await db.Entry(report).Collection(r => r.Instances).LoadAsync(ct);
+
+            try
+            {
+                await notificationAlertService.NotifyInstanceEventAsync(
+                    report,
+                    null,
+                    "ReportCreated",
+                    createdByUserId,
+                    ct
+                );
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Error al enviar notificacion de ReportCreated para {Code}",
+                    report.Code
+                );
+            }
 
             return ApiResponse<ReportResponse>.Ok(
                 ToResponse(report),

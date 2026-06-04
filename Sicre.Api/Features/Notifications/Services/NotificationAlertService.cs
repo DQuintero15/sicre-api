@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Sicre.Api.Domain.Entities;
 using Sicre.Api.Domain.Enums;
 using Sicre.Api.Features.Notifications.Dtos;
+using Sicre.Api.Features.Reports.Dtos;
 using Sicre.Api.Infrastructure.Persistence;
+using Sicre.Api.Shared;
 using Sicre.Api.Shared.Email;
 
 namespace Sicre.Api.Features.Notifications.Services;
@@ -15,11 +17,21 @@ public interface INotificationAlertService
         Guid triggeredByUserId,
         CancellationToken ct = default
     );
+
+    Task NotifyInstanceEventAsync(
+        Report report,
+        ReportInstance? instance,
+        string eventType,
+        Guid triggeredByUserId,
+        CancellationToken ct = default
+    );
+
+    Task NotifyInstanceCreatedAsync(ReportInstance instance, CancellationToken ct = default);
 }
 
 public class NotificationAlertService(
     ApplicationDbContext db,
-    IEmailService emailService,
+    IEmailBackgroundQueue emailQueue,
     IEmailTemplateService emailTemplateService,
     INotificationRealtimeService realtimeService,
     ILogger<NotificationAlertService> logger
@@ -98,10 +110,17 @@ public class NotificationAlertService(
                     content,
                     instance.Id
                 );
-                await emailService.SendEmailAsync(email, title, emailBody);
+                emailQueue.Enqueue(
+                    new EmailNotificationJob
+                    {
+                        Email = email,
+                        Subject = title,
+                        Body = emailBody,
+                    }
+                );
 
                 logger.LogInformation(
-                    "Notificación de evento {EventType} enviada por email a suscriptor {Email} para instancia {InstanceId}.",
+                    "Notificación de evento {EventType} encolada para email a suscriptor {Email} — instancia {InstanceId}.",
                     eventType,
                     email,
                     instanceId
@@ -119,23 +138,272 @@ public class NotificationAlertService(
         }
     }
 
+    public async Task NotifyInstanceEventAsync(
+        Report report,
+        ReportInstance? instance,
+        string eventType,
+        Guid triggeredByUserId,
+        CancellationToken ct = default
+    )
+    {
+        try
+        {
+            var settings = await db.SICRESettings.FirstOrDefaultAsync(ct);
+            var autoNotify = settings?.AutoNotify ?? false;
+
+            var triggerUser = await db.Users.FindAsync([triggeredByUserId], ct);
+            var triggerName = triggerUser is not null
+                ? $"{triggerUser.FirstName} {triggerUser.LastName}"
+                : "Un usuario";
+
+            var (title, content, severity) = BuildEventMessage(
+                eventType,
+                triggerName,
+                instance,
+                report
+            );
+
+            var priority = severity switch
+            {
+                NotificationSeverity.Critical => NotificationPriority.Critical,
+                NotificationSeverity.Urgent => NotificationPriority.High,
+                NotificationSeverity.Warning => NotificationPriority.Normal,
+                _ => NotificationPriority.Low,
+            };
+
+            var recipients = eventType switch
+            {
+                "ReportCreated" => await CollectReportCreatedRecipients(report, ct),
+                _ => CollectRecipients(eventType, instance!, triggeredByUserId)
+                    .Select(kvp => new NotificationRecipient
+                    {
+                        UserId = kvp.Key,
+                        Email = kvp.Value.Email,
+                        SendAppNotification = true,
+                        SendEmail = autoNotify && !string.IsNullOrWhiteSpace(kvp.Value.Email),
+                    })
+                    .ToList(),
+            };
+
+            foreach (var recipient in recipients)
+            {
+                if (recipient.SendAppNotification && recipient.UserId.HasValue)
+                {
+                    var notification = new Notification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = recipient.UserId.Value,
+                        Title = title,
+                        Content = content,
+                        Type = NotificationType.APP,
+                        Severity = severity,
+                        Priority = priority,
+                        ReportInstanceId = instance?.Id,
+                        Url = instance is not null
+                            ? $"/report-instances/{instance.Id}"
+                            : $"/reportes/{report.Id}/detalle",
+                        CreatedAt = DateTime.UtcNow,
+                    };
+
+                    db.Notifications.Add(notification);
+                    await db.SaveChangesAsync(ct);
+
+                    await realtimeService.PublishCreatedAsync(
+                        new NotificationDto
+                        {
+                            Id = notification.Id,
+                            Title = notification.Title,
+                            Content = notification.Content,
+                            Type = notification.Type,
+                            Severity = notification.Severity,
+                            Priority = notification.Priority,
+                            Readed = false,
+                            CreatedAt = notification.CreatedAt,
+                            ReportInstanceId = notification.ReportInstanceId,
+                            Url = notification.Url,
+                        },
+                        recipient.UserId.Value
+                    );
+                }
+
+                if (autoNotify && !string.IsNullOrWhiteSpace(recipient.Email))
+                {
+                    string emailBody;
+                    if (instance is not null)
+                    {
+                        emailBody = emailTemplateService.GetInstanceEventEmailTemplate(
+                            triggerName,
+                            eventType,
+                            title,
+                            content,
+                            instance.Id
+                        );
+                    }
+                    else
+                    {
+                        var role = recipient.UserId.HasValue ? "Responsable" : "Destinatario";
+
+                        var dto = new ReportsAssignedEmailDto
+                        {
+                            UserName = recipient.Email!,
+                            Role = role,
+                            ControlEntityAbbreviation =
+                                report.ControlEntity?.Abbreviation
+                                ?? report.ControlEntity?.Name
+                                ?? "",
+                            ControlEntityName = report.ControlEntity?.Name ?? "",
+                            ReportCode = report.Code,
+                            ReportName = report.Name,
+                            BranchName = report.Branch?.Name,
+                            TotalReports = 1,
+                            TotalInstances = report.Instances?.Count ?? 0,
+                            Instances =
+                                report
+                                    .Instances?.Select(i => new ReportInstanceSummaryEmailDto
+                                    {
+                                        Id = i.Id,
+                                        PeriodName = i.PeriodName,
+                                        DueDate = i.DueDate,
+                                        PeriodStart = i.PeriodStart,
+                                        PeriodEnd = i.PeriodEnd,
+                                        Status = i.Status,
+                                    })
+                                    .ToList()
+                                ?? [],
+                        };
+
+                        var notificationId = Guid.NewGuid();
+                        emailBody = emailTemplateService.GetReportsAssignedEmailTemplate(
+                            dto,
+                            notificationId
+                        );
+                    }
+
+                    emailQueue.Enqueue(
+                        new EmailNotificationJob
+                        {
+                            Email = recipient.Email,
+                            Subject = title,
+                            Body = emailBody,
+                        }
+                    );
+
+                    logger.LogInformation(
+                        "Notificación de evento {EventType} encolada para email a {Email} — reporte {ReportCode}.",
+                        eventType,
+                        recipient.Email,
+                        report.Code
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error enviando notificaciones de evento {EventType} para reporte {ReportCode}.",
+                eventType,
+                report.Code
+            );
+        }
+    }
+
+    public async Task NotifyInstanceCreatedAsync(ReportInstance instance, CancellationToken ct = default)
+    {
+        try
+        {
+            if (instance?.Report is null)
+                return;
+
+            var settings = await db.SICRESettings.FirstOrDefaultAsync(ct);
+            var autoNotify = settings?.AutoNotify ?? false;
+
+            if (!autoNotify)
+                return;
+
+            var title = "Nueva instancia asignada";
+            var content =
+                $"Se ha generado una nueva instancia para el reporte '{instance.Report.Name}' — Período: {instance.PeriodName} — Vence: {instance.DueDate:dd/MM/yyyy}";
+            var severity = NotificationSeverity.Info;
+            var priority = NotificationPriority.Low;
+
+            var users = new[] { instance.ResponsibleUser, instance.SupervisorUser };
+
+            foreach (var user in users)
+            {
+                if (user is null)
+                    continue;
+
+                var notification = new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    Title = title,
+                    Content = content,
+                    Type = NotificationType.APP,
+                    Severity = severity,
+                    Priority = priority,
+                    ReportInstanceId = instance.Id,
+                    Url = $"/report-instances/{instance.Id}",
+                    CreatedAt = DateTime.UtcNow,
+                };
+
+                db.Notifications.Add(notification);
+                await db.SaveChangesAsync(ct);
+
+                await realtimeService.PublishCreatedAsync(
+                    new NotificationDto
+                    {
+                        Id = notification.Id,
+                        Title = notification.Title,
+                        Content = notification.Content,
+                        Type = notification.Type,
+                        Severity = notification.Severity,
+                        Priority = notification.Priority,
+                        Readed = false,
+                        CreatedAt = notification.CreatedAt,
+                        ReportInstanceId = notification.ReportInstanceId,
+                        Url = notification.Url,
+                    },
+                    user.Id
+                );
+            }
+
+            logger.LogInformation(
+                "Notificación de creación de instancia enviada para instancia {InstanceId}.",
+                instance.Id
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error enviando notificación de creación de instancia {InstanceId}.",
+                instance?.Id
+            );
+        }
+    }
+
     private static (string title, string content, NotificationSeverity severity) BuildEventMessage(
         string eventType,
         string triggerName,
-        ReportInstance instance
+        ReportInstance? instance,
+        Report? report = null
     )
     {
-        var reportCode = instance.Report?.Code ?? string.Empty;
-        var reportName = instance.Report?.Name ?? "Reporte";
-        var periodName = instance.PeriodName;
+        report ??= instance?.Report;
+
+        var reportCode = report?.Code ?? string.Empty;
+        var reportName = report?.Name ?? "Reporte";
+        var periodName = instance?.PeriodName ?? string.Empty;
+
         var entityAbbr =
-            instance.Report?.ControlEntity?.Abbreviation
-            ?? instance.Report?.ControlEntity?.Name
-            ?? string.Empty;
+            report?.ControlEntity?.Abbreviation ?? report?.ControlEntity?.Name ?? string.Empty;
         var prefix = string.IsNullOrWhiteSpace(entityAbbr) ? string.Empty : $"[{entityAbbr}] ";
 
         return eventType switch
         {
+            "ReportCreated" => BuildReportCreatedMessage(report!, instance),
             "Delivered" => (
                 $"{prefix}{reportCode} — Reporte enviado",
                 $"{triggerName} marcó el reporte '{reportName}' (período {periodName}) como enviado.",
@@ -167,6 +435,19 @@ public class NotificationAlertService(
                 NotificationSeverity.General
             ),
         };
+    }
+
+    private static (
+        string title,
+        string content,
+        NotificationSeverity severity
+    ) BuildReportCreatedMessage(Report report, ReportInstance? instance)
+    {
+        var instancesCount = report.Instances?.Count ?? 0;
+        var title = $"Nuevo reporte: {report.Name}";
+        var content =
+            $"Se ha creado el reporte {report.Name} ({report.Code}) - {instancesCount} instancias generadas.";
+        return (title, content, NotificationSeverity.General);
     }
 
     private Dictionary<Guid, User> CollectRecipients(
@@ -233,6 +514,73 @@ public class NotificationAlertService(
         }
 
         return users;
+    }
+
+    private async Task<List<NotificationRecipient>> CollectReportCreatedRecipients(
+        Report report,
+        CancellationToken ct
+    )
+    {
+        var recipients = new List<NotificationRecipient>();
+
+        var userIds = new[]
+        {
+            report.SenderResponsibleUserId,
+            report.EntityUploadResponsibleUserId,
+            report.FollowUpLeaderUserId,
+        }
+            .Distinct()
+            .ToList();
+
+        var users = await db.Users.Where(u => userIds.Contains(u.Id)).ToListAsync(ct);
+
+        foreach (var user in users)
+        {
+            recipients.Add(
+                new NotificationRecipient
+                {
+                    UserId = user.Id,
+                    Email = user.Email,
+                    SendAppNotification = true,
+                    SendEmail = true,
+                }
+            );
+        }
+
+        var extraEmails = (report.NotificationEmails ?? "")
+            .Split(
+                [';', ','],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+            .Select(e => e.Trim())
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .ToList();
+
+        foreach (var email in extraEmails)
+        {
+            if (
+                !recipients.Any(r =>
+                    string.Equals(r.Email, email, StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            {
+                var extraUser = await db
+                    .Users.Where(u => u.Email != null && u.Email.ToLower() == email.ToLower())
+                    .FirstOrDefaultAsync(ct);
+
+                recipients.Add(
+                    new NotificationRecipient
+                    {
+                        UserId = extraUser?.Id,
+                        Email = email,
+                        SendAppNotification = true,
+                        SendEmail = true,
+                    }
+                );
+            }
+        }
+
+        return recipients;
     }
 
     private List<string> GetEmailSubscribers(
@@ -338,7 +686,14 @@ public class NotificationAlertService(
                 content,
                 instance.Id
             );
-            await emailService.SendEmailAsync(user.Email!, title, emailBody);
+            emailQueue.Enqueue(
+                new EmailNotificationJob
+                {
+                    Email = user.Email!,
+                    Subject = title,
+                    Body = emailBody,
+                }
+            );
         }
 
         logger.LogInformation(
@@ -348,4 +703,12 @@ public class NotificationAlertService(
             instance.Id
         );
     }
+}
+
+public class NotificationRecipient
+{
+    public Guid? UserId { get; set; }
+    public string? Email { get; set; }
+    public bool SendAppNotification { get; set; }
+    public bool SendEmail { get; set; }
 }
