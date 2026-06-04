@@ -99,6 +99,16 @@ public class ControlEntityService(ILogger<ControlEntityService> logger, Applicat
                 query = query.Where(e => e.Name.ToLower().Contains(name));
             }
 
+            if (!string.IsNullOrWhiteSpace(filter.Search))
+            {
+                var search = filter.Search.ToLower();
+                query = query.Where(e =>
+                    (e.Name != null && e.Name.ToLower().Contains(search))
+                    || (e.Abbreviation != null && e.Abbreviation.ToLower().Contains(search))
+                    || (e.Nit != null && e.Nit.Contains(search))
+                );
+            }
+
             if (!string.IsNullOrWhiteSpace(filter.Nit))
                 query = query.Where(e => e.Nit != null && e.Nit.Contains(filter.Nit));
 
