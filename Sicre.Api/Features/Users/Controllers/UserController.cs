@@ -77,4 +77,22 @@ public class UserController(
         var result = await userCsvImportService.ImportUsersAsync(file);
         return FromResult(result);
     }
+
+    [HttpPost("{id:guid}/resend-temporary-password")]
+    [Authorize(Roles = nameof(Sicre.Api.Domain.Enums.Role.Administrator))]
+    public async Task<ActionResult<ApiResponse<bool>>> ResendTemporaryPassword(Guid id)
+    {
+        var result = await userService.ResendTemporaryPasswordAsync(id);
+        return FromResult(result);
+    }
+
+    [HttpPost("resend-temporary-password/bulk")]
+    [Authorize(Roles = nameof(Sicre.Api.Domain.Enums.Role.Administrator))]
+    public async Task<
+        ActionResult<ApiResponse<ResendTemporaryPasswordBulkResponseDto>>
+    > ResendTemporaryPasswordBulk()
+    {
+        var result = await userService.ResendTemporaryPasswordBulkAsync();
+        return FromResult(result);
+    }
 }

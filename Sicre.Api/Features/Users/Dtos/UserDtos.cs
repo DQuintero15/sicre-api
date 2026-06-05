@@ -68,6 +68,13 @@ public class ImportUsersFromCsvResponseDto
     public List<ImportUsersFromCsvRowResultDto> Rows { get; set; } = [];
 }
 
+public class ResendTemporaryPasswordBulkResponseDto
+{
+    public int TotalPending { get; set; }
+    public int Sent { get; set; }
+    public int Failed { get; set; }
+}
+
 public class ImportUsersFromCsvRowResultDto
 {
     public int RowNumber { get; set; }

@@ -17,6 +17,8 @@ public interface IUserService
     Task<ApiResponse<UserDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto dto);
     Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto dto);
+    Task<ApiResponse<bool>> ResendTemporaryPasswordAsync(Guid id);
+    Task<ApiResponse<ResendTemporaryPasswordBulkResponseDto>> ResendTemporaryPasswordBulkAsync();
 }
 
 public class UserService(
@@ -319,6 +321,116 @@ public class UserService(
             return ApiResponse<UserDto>.Fail(
                 HttpStatusCode.InternalServerError,
                 "Error al actualizar el usuario."
+            );
+        }
+    }
+
+    public async Task<ApiResponse<bool>> ResendTemporaryPasswordAsync(Guid id)
+    {
+        try
+        {
+            var user = await userManager.FindByIdAsync(id.ToString());
+            if (user == null)
+                return ApiResponse<bool>.Fail(HttpStatusCode.NotFound, "Usuario no encontrado.");
+
+            if (user.HasChangedDefaultPassword)
+                return ApiResponse<bool>.Fail(
+                    HttpStatusCode.Conflict,
+                    "El usuario ya realizó su primer cambio de contraseña."
+                );
+
+            var newPassword = passwordService.GenerateSecurePassword(15);
+            var token = await userManager.GeneratePasswordResetTokenAsync(user);
+            var reset = await userManager.ResetPasswordAsync(user, token, newPassword);
+
+            if (!reset.Succeeded)
+            {
+                logger.LogError(
+                    "Error al restablecer contraseña para reenvío: {Errors}",
+                    string.Join(", ", reset.Errors.Select(e => e.Description))
+                );
+                return ApiResponse<bool>.Fail(
+                    HttpStatusCode.BadRequest,
+                    "Error al generar la nueva contraseña temporal."
+                );
+            }
+
+            _ = SendCredentialsEmailAsync(user, newPassword);
+
+            return ApiResponse<bool>.Ok(
+                true,
+                "Correo de contraseña temporal enviado exitosamente."
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error al reenviar contraseña temporal al usuario {Id}", id);
+            return ApiResponse<bool>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error al reenviar la contraseña temporal."
+            );
+        }
+    }
+
+    public async Task<
+        ApiResponse<ResendTemporaryPasswordBulkResponseDto>
+    > ResendTemporaryPasswordBulkAsync()
+    {
+        try
+        {
+            var pendingUsers = await db
+                .Users.Where(u => !u.HasChangedDefaultPassword && u.IsActive)
+                .ToListAsync();
+
+            int sent = 0;
+            int failed = 0;
+
+            foreach (var user in pendingUsers)
+            {
+                try
+                {
+                    var newPassword = passwordService.GenerateSecurePassword(15);
+                    var token = await userManager.GeneratePasswordResetTokenAsync(user);
+                    var reset = await userManager.ResetPasswordAsync(user, token, newPassword);
+
+                    if (reset.Succeeded)
+                    {
+                        _ = SendCredentialsEmailAsync(user, newPassword);
+                        sent++;
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "No se pudo restablecer contraseña para usuario {Id}: {Errors}",
+                            user.Id,
+                            string.Join(", ", reset.Errors.Select(e => e.Description))
+                        );
+                        failed++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error procesando usuario {Id} en envío masivo", user.Id);
+                    failed++;
+                }
+            }
+
+            return ApiResponse<ResendTemporaryPasswordBulkResponseDto>.Ok(
+                new ResendTemporaryPasswordBulkResponseDto
+                {
+                    TotalPending = pendingUsers.Count,
+                    Sent = sent,
+                    Failed = failed,
+                },
+                $"Envío masivo completado: {sent} enviados, {failed} fallidos."
+            );
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error en envío masivo de contraseñas temporales");
+            return ApiResponse<ResendTemporaryPasswordBulkResponseDto>.Fail(
+                HttpStatusCode.InternalServerError,
+                "Error en el envío masivo de contraseñas temporales."
             );
         }
     }
