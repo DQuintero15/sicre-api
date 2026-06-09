@@ -103,6 +103,18 @@ public class ReportService(
                 );
             }
 
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                var name = request.Name.ToLower();
+                query = query.Where(r => r.Name.ToLower().Contains(name));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Code))
+            {
+                var code = request.Code.ToLower();
+                query = query.Where(r => r.Code.ToLower().Contains(code));
+            }
+
             var total = await query.CountAsync(ct);
 
             // ── Smart default ordering ────────────────────────────────

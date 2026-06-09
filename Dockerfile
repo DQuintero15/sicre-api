@@ -6,9 +6,6 @@ RUN dotnet restore "Sicre.Api/Sicre.Api.csproj"
 
 COPY . .
 WORKDIR "/src/Sicre.Api"
-RUN dotnet build "Sicre.Api.csproj" -c Release -o /app/build
-
-FROM build AS publish
 RUN dotnet publish "Sicre.Api.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
@@ -22,6 +19,6 @@ ENV TZ=America/Bogota
 
 EXPOSE 9001
 
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 ENTRYPOINT ["dotnet", "Sicre.Api.dll"]
