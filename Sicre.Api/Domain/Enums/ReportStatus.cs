@@ -15,4 +15,7 @@ public enum ReportStatus
 
     [Display(Name = "Vencido")]
     Overdue = 4,
+
+    [Display(Name = "Próximo a Vencer")]
+    UpcomingDue = 5,
 }

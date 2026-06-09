@@ -779,7 +779,7 @@ public class ReportInstanceService(
             DueDate = ri.DueDate,
             EventDate = ri.EventDate,
             SentDate = ri.SentDate,
-            Status = ri.Status,
+            Status = ComputeEffectiveStatus(ri),
             DelayReason = ri.DelayReason,
             Observations = ri.Observations,
             ManualActivationReason = ri.ManualActivationReason,
@@ -809,6 +809,21 @@ public class ReportInstanceService(
             UpdatedAt = ri.UpdatedAt,
         };
 
+    private static ReportStatus ComputeEffectiveStatus(ReportInstance ri)
+    {
+        if (ri.Status != ReportStatus.Pending || ri.Report is null)
+            return ri.Status;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var days = (
+            ri.DueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
+        ).Days;
+
+        return days >= 0 && days <= ri.Report.AlertCriticalDays
+            ? ReportStatus.UpcomingDue
+            : ri.Status;
+    }
+
     private static ReportInstanceSummaryResponse ToSummary(ReportInstance ri) =>
         new()
         {
@@ -820,7 +835,7 @@ public class ReportInstanceService(
             PeriodYear = ri.PeriodYear,
             PeriodMonth = ri.PeriodMonth,
             DueDate = ri.DueDate,
-            Status = ri.Status,
+            Status = ComputeEffectiveStatus(ri),
             EventDate = ri.EventDate,
             SentDate = ri.SentDate,
             CreatedAt = ri.CreatedAt,
