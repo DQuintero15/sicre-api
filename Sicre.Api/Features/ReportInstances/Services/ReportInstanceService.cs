@@ -819,9 +819,9 @@ public class ReportInstanceService(
             ri.DueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
         ).Days;
 
-        return days >= 0 && days <= ri.Report.AlertCriticalDays
-            ? ReportStatus.UpcomingDue
-            : ri.Status;
+        if (days < 0) return ReportStatus.Overdue;
+        if (days <= ri.Report.AlertCriticalDays) return ReportStatus.UpcomingDue;
+        return ri.Status;
     }
 
     private static ReportInstanceSummaryResponse ToSummary(ReportInstance ri) =>

@@ -635,7 +635,9 @@ public class ReportService(
             dueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
         ).Days;
 
-        return days >= 0 && days <= alertCriticalDays ? ReportStatus.UpcomingDue : dbStatus;
+        if (days < 0) return ReportStatus.Overdue;
+        if (days <= alertCriticalDays) return ReportStatus.UpcomingDue;
+        return dbStatus;
     }
 
     private static ReportSummaryResponse ToSummary(Report r)
