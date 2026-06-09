@@ -25,6 +25,15 @@ public class ReportInstanceResponse
     public string? ResponsibleUserName { get; set; }
     public Guid SupervisorUserId { get; set; }
     public string? SupervisorUserName { get; set; }
+    public string? CreatedByUserName { get; set; }
+    public string? ActivatedByUserName { get; set; }
+    public DateTime? ActivatedAt { get; set; }
+    public string? ControlEntityName { get; set; }
+    public string? ProcessName { get; set; }
+    public string? BranchName { get; set; }
+    public string? ReportDescription { get; set; }
+    public string? ReportLegalBasis { get; set; }
+    public string? InstructionsUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public int AttachmentsCount { get; set; }

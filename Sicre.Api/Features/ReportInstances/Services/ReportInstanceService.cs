@@ -138,8 +138,15 @@ public class ReportInstanceService(
         {
             var instance = await db
                 .ReportInstances.Include(ri => ri.Report)
+                    .ThenInclude(r => r!.ControlEntity)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.Process)
+                .Include(ri => ri.Report)
+                    .ThenInclude(r => r!.Branch)
                 .Include(ri => ri.ResponsibleUser)
                 .Include(ri => ri.SupervisorUser)
+                .Include(ri => ri.CreatedByUser)
+                .Include(ri => ri.ActivatedByUser)
                 .Include(ri => ri.Reversions)
                     .ThenInclude(r => r.CreatedByUser)
                 .FirstOrDefaultAsync(ri => ri.Id == id, ct);
@@ -785,6 +792,19 @@ public class ReportInstanceService(
             SupervisorUserName = ri.SupervisorUser is not null
                 ? $"{ri.SupervisorUser.FirstName} {ri.SupervisorUser.LastName}"
                 : null,
+            CreatedByUserName = ri.CreatedByUser is not null
+                ? $"{ri.CreatedByUser.FirstName} {ri.CreatedByUser.LastName}"
+                : null,
+            ActivatedByUserName = ri.ActivatedByUser is not null
+                ? $"{ri.ActivatedByUser.FirstName} {ri.ActivatedByUser.LastName}"
+                : null,
+            ActivatedAt = ri.ActivatedAt,
+            ControlEntityName = ri.Report?.ControlEntity?.Name,
+            ProcessName = ri.Report?.Process?.Name,
+            BranchName = ri.Report?.Branch?.Name,
+            ReportDescription = ri.Report?.Description,
+            ReportLegalBasis = ri.Report?.LegalBasis,
+            InstructionsUrl = ri.Report?.InstructionsUrl,
             CreatedAt = ri.CreatedAt,
             UpdatedAt = ri.UpdatedAt,
         };
