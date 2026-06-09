@@ -809,20 +809,10 @@ public class ReportInstanceService(
             UpdatedAt = ri.UpdatedAt,
         };
 
-    private static ReportStatus ComputeEffectiveStatus(ReportInstance ri)
-    {
-        if (ri.Status != ReportStatus.Pending || ri.Report is null)
-            return ri.Status;
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var days = (
-            ri.DueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
-        ).Days;
-
-        if (days < 0) return ReportStatus.Overdue;
-        if (days <= ri.Report.AlertCriticalDays) return ReportStatus.UpcomingDue;
-        return ri.Status;
-    }
+    private static ReportStatus ComputeEffectiveStatus(ReportInstance ri) =>
+        ri.Report is null
+            ? ri.Status
+            : ReportStatusHelper.Compute(ri.Status, ri.DueDate, ri.Report.AlertCriticalDays);
 
     private static ReportInstanceSummaryResponse ToSummary(ReportInstance ri) =>
         new()

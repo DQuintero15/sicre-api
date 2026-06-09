@@ -9,6 +9,7 @@ using Sicre.Api.Features.Reports.Dtos.Requests;
 using Sicre.Api.Features.Reports.Dtos.Responses;
 using Sicre.Api.Infrastructure.Persistence;
 using Sicre.Api.Shared;
+using Sicre.Api.Shared;
 
 namespace Sicre.Api.Features.Reports.Services;
 
@@ -621,24 +622,6 @@ public class ReportService(
             UpdatedAt = r.UpdatedAt,
         };
 
-    private static ReportStatus ComputeInstanceEffectiveStatus(
-        ReportStatus dbStatus,
-        DateOnly dueDate,
-        int alertCriticalDays
-    )
-    {
-        if (dbStatus != ReportStatus.Pending)
-            return dbStatus;
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var days = (
-            dueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
-        ).Days;
-
-        if (days < 0) return ReportStatus.Overdue;
-        if (days <= alertCriticalDays) return ReportStatus.UpcomingDue;
-        return dbStatus;
-    }
 
     private static ReportSummaryResponse ToSummary(Report r)
     {
@@ -665,15 +648,15 @@ public class ReportService(
             TotalInstances = instances.Count,
             PendingInstances = instances.Count(i =>
                 i.Status == ReportStatus.Pending
-                && ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                && ReportStatusHelper.Compute(i.Status, i.DueDate, r.AlertCriticalDays)
                     == ReportStatus.Pending
             ),
             UpcomingDueInstances = instances.Count(i =>
-                ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                ReportStatusHelper.Compute(i.Status, i.DueDate, r.AlertCriticalDays)
                 == ReportStatus.UpcomingDue
             ),
             OverdueInstances = instances.Count(i =>
-                ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                ReportStatusHelper.Compute(i.Status, i.DueDate, r.AlertCriticalDays)
                 == ReportStatus.Overdue
             ),
             CompletedInstances = instances.Count(i =>
@@ -695,7 +678,7 @@ public class ReportService(
                     PeriodYear = i.PeriodYear,
                     PeriodMonth = i.PeriodMonth,
                     DueDate = i.DueDate,
-                    Status = ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays),
+                    Status = ReportStatusHelper.Compute(i.Status, i.DueDate, r.AlertCriticalDays),
                     EventDate = i.EventDate,
                     SentDate = i.SentDate,
                     ResponsibleUserId = i.ResponsibleUserId,
