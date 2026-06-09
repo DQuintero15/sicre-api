@@ -672,7 +672,10 @@ public class ReportService(
                 ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
                 == ReportStatus.UpcomingDue
             ),
-            OverdueInstances = instances.Count(i => i.Status == ReportStatus.Overdue),
+            OverdueInstances = instances.Count(i =>
+                ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                == ReportStatus.Overdue
+            ),
             CompletedInstances = instances.Count(i =>
                 i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
             ),

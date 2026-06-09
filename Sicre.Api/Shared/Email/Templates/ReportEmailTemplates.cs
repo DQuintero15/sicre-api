@@ -134,7 +134,10 @@ internal static class ReportEmailTemplates
                 var (color, label) = i.Status switch
                 {
                     ReportStatus.Pending => ("#d97706", "Pendiente"),
+                    ReportStatus.UpcomingDue => ("#f59e0b", "Próx. a Vencer"),
                     ReportStatus.Overdue => ("#dc2626", "Vencido"),
+                    ReportStatus.SentOnTime => ("#16a34a", "Enviado a tiempo"),
+                    ReportStatus.SentLate => ("#d97706", "Enviado tarde"),
                     _ => ("#6b7280", "Desconocido"),
                 };
                 return $"""
