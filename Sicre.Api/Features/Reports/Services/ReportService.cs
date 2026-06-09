@@ -621,8 +621,26 @@ public class ReportService(
             UpdatedAt = r.UpdatedAt,
         };
 
+    private static ReportStatus ComputeInstanceEffectiveStatus(
+        ReportStatus dbStatus,
+        DateOnly dueDate,
+        int alertCriticalDays
+    )
+    {
+        if (dbStatus != ReportStatus.Pending)
+            return dbStatus;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var days = (
+            dueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)
+        ).Days;
+
+        return days >= 0 && days <= alertCriticalDays ? ReportStatus.UpcomingDue : dbStatus;
+    }
+
     private static ReportSummaryResponse ToSummary(Report r)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var instances = r.Instances.OrderBy(i => i.DueDate).ToList();
         return new()
         {
@@ -643,7 +661,15 @@ public class ReportService(
             IsActive = r.IsActive,
             CreatedAt = r.CreatedAt,
             TotalInstances = instances.Count,
-            PendingInstances = instances.Count(i => i.Status == ReportStatus.Pending),
+            PendingInstances = instances.Count(i =>
+                i.Status == ReportStatus.Pending
+                && ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                    == ReportStatus.Pending
+            ),
+            UpcomingDueInstances = instances.Count(i =>
+                ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays)
+                == ReportStatus.UpcomingDue
+            ),
             OverdueInstances = instances.Count(i => i.Status == ReportStatus.Overdue),
             CompletedInstances = instances.Count(i =>
                 i.Status == ReportStatus.SentOnTime || i.Status == ReportStatus.SentLate
@@ -664,7 +690,7 @@ public class ReportService(
                     PeriodYear = i.PeriodYear,
                     PeriodMonth = i.PeriodMonth,
                     DueDate = i.DueDate,
-                    Status = i.Status,
+                    Status = ComputeInstanceEffectiveStatus(i.Status, i.DueDate, r.AlertCriticalDays),
                     EventDate = i.EventDate,
                     SentDate = i.SentDate,
                     ResponsibleUserId = i.ResponsibleUserId,
